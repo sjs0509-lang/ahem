@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스탠리파크에서 길을 잃은 날</title>
+  <meta name="description" content="길을 잃은 동안, 나는 언제 가장 불안했을까?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 0. 첫 화면 -->
+  <header class="hero">
+    <p class="kicker" id="hero-kicker"></p>
+    <h1 id="hero-title"></h1>
+    <p class="question" id="hero-question"></p>
+    <p class="scroll-hint"><span id="hero-hint"></span><span class="scroll-arrow" aria-hidden="true">↓</span></p>
+  </header>
+
+  <!-- 1. 지도 + 사건 카드 -->
+  <section class="story" id="story">
+    <div class="stage">
+      <div class="map-wrap">
+        <svg id="map" role="img" aria-label="스탠리파크 지도와 이동 경로"></svg>
+      </div>
+      <div class="strip-wrap">
+        <svg id="strip" viewBox="0 0 600 118" role="img" aria-label="사건별 불안 정도"></svg>
+      </div>
+    </div>
+    <div class="steps" id="steps"></div>
+  </section>
+
+  <!-- 2. NODE 비교 -->
+  <section class="compare" id="compare"></section>
+
+  <!-- 3. 인사이트 -->
+  <section class="insight" id="insight"></section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="data.js"></script>
+  <script src="map.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

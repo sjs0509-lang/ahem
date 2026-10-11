@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스탠리파크에서 길을 잃은 날</title>
+  <meta name="description" content="그날 나는 언제 길을 잃었다고 느꼈을까?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 0. 첫 화면 -->
+  <header class="hero">
+    <p class="hero-place" id="hero-place"></p>
+    <h1 id="hero-title"></h1>
+    <p class="hero-question" id="hero-question"></p>
+    <p class="hero-hint"><span id="hero-hint"></span> <span aria-hidden="true">↓</span></p>
+  </header>
+
+  <!-- 1. 읽는 법 -->
+  <section class="how" id="how"></section>
+
+  <!-- 2. 이동 구간 -->
+  <section class="ride" id="ride">
+    <div class="stage" id="stage" aria-hidden="true">
+      <div class="gauge">
+        <svg class="wheel" id="wheel" viewBox="-50 -50 100 100"></svg>
+        <dl class="meters">
+          <div><dt>장면</dt><dd id="m-scene">—</dd></div>
+          <div><dt>걸린 시간</dt><dd id="m-time">—</dd></div>
+          <div><dt>배터리</dt><dd id="m-batt">—</dd></div>
+        </dl>
+        <p class="gauge-note" id="gauge-note"></p>
+      </div>
+      <div class="panes">
+        <div class="pane pane-guide" id="pane-guide"></div>
+        <svg class="link" id="link" viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="pane pane-space" id="pane-space">
+          <div class="filmstrip" id="filmstrip"></div>
+          <p class="space-says" id="space-says"></p>
+        </div>
+      </div>
+    </div>
+    <div class="scenes" id="scenes"></div>
+  </section>
+
+  <!-- 3. 펼친 경로 -->
+  <section class="route" id="route"></section>
+
+  <!-- 4. 주제 문장 -->
+  <section class="thesis" id="thesis"></section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <!-- 장면 상세 -->
+  <dialog class="detail" id="detail"></dialog>
+
+  <script src="data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

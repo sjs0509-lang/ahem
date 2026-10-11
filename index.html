@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stanley Park — 길을 잃었다고 느낀 순간</title>
+  <meta name="description" content="그날 나는 언제 길을 잃었다고 느꼈을까?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 1. 첫 화면 -->
+  <header class="hero" id="hero">
+    <span class="corner tl en" data-t="0"></span>
+    <span class="corner tr en" data-t="1"></span>
+    <span class="corner bl ko" data-t="2"></span>
+    <span class="corner br ko" data-t="3"></span>
+    <div class="hero-center">
+      <svg class="hero-curve" viewBox="0 0 600 160" aria-hidden="true"></svg>
+      <p class="hero-q" id="hero-q"></p>
+      <p class="note hero-scroll"><i class="dot"></i><i class="lead"></i><span id="hero-scroll"></span></p>
+    </div>
+  </header>
+
+  <!-- 2. 지도 위 한 바퀴 -->
+  <section class="ride" id="ride">
+    <div class="stage" id="stage">
+      <svg class="map" id="map" aria-label="스탠리파크 한 바퀴 경로"></svg>
+
+      <div class="hud tl en">STANLEY PARK</div>
+      <div class="hud tr"><span class="en" id="clock">0</span><span class="unit">MIN</span><span class="est" id="clock-est"></span></div>
+      <div class="hud bl"><span class="en hud-label" id="hud-label"></span><span class="hud-title" id="hud-title"></span></div>
+      <div class="hud br key">
+        <span><i style="background:var(--blue)"></i>SPACE 공간</span>
+        <span><i style="background:var(--yellow)"></i>PERSON 사람</span>
+        <span><i style="background:var(--pink)"></i>PHONE 휴대폰</span>
+      </div>
+
+      <div class="howto" id="howto"></div>
+
+      <div class="close" id="close" aria-live="polite">
+        <div class="close-wheel" id="close-wheel">
+          <svg class="wheel" viewBox="-100 -100 200 200" aria-hidden="true"><g id="wheel-rot"></g></svg>
+          <div class="card" id="card"></div>
+        </div>
+        <p class="note close-act" id="close-act"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 완성된 한 바퀴 + 주제 문장 -->
+  <section class="loop" id="loop">
+    <span class="corner tl en">ONE LOOP</span>
+    <span class="corner tr en" id="loop-total"></span>
+    <svg class="map" id="map-full" aria-label="완성된 한 바퀴 경로"></svg>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="thesis" id="thesis"></section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
