@@ -34,6 +34,11 @@ const TEXT = {
     "그 연결이 끊긴 순간 나는 길을 잃었다고 느꼈다."
   ],
   coda: "세 번 모두, 다시 이어준 건 사람이었다.",
+
+  // NODE 클로즈업의 펜툴 핸들
+  pullHint: "핸들을 당겨보세요",
+  pullMatch: "그날 나는 이만큼 길게 느꼈다",
+  pullSame: "그날은 실제만큼 느꼈다",
   footer: "정보디자인 · Stanley Park, Vancouver"
 };
 

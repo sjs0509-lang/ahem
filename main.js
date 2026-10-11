@@ -412,6 +412,169 @@
       ${sc.memory ? `<p class="card-mem">기억: ${esc(sc.memory)}</p>` : ""}`;
   }
 
+  /* ---------- 펜툴 핸들로 체감시간 늘리기 ----------
+     두 앵커 사이 거리 = 실제 시간 (고정)
+     곡선 길이 ÷ 직선 길이 × 실제 시간 = 체감 시간                     */
+  const pullBox = $("#pull");
+  const pull = (function () {
+    const A = [130, 190], B = [230, 190], CHORD = B[0] - A[0];
+    const REST = [A[0] + 24, A[1] - 7];        // 처음 핸들: 짧아서 거의 직선
+    const SNAP = 0.35;                         // 기록된 체감 비율과 이만큼 가까우면 딱 맞춤
+    const mirror = (c) => [A[0] + B[0] - c[0], c[1]];
+    const bez = (c1, c2, t) => {
+      const u = 1 - t;
+      return [0, 1].map((k) => u * u * u * A[k] + 3 * u * u * t * c1[k] + 3 * u * t * t * c2[k] + t * t * t * B[k]);
+    };
+    const lenOf = (c1) => {
+      const c2 = mirror(c1);
+      let L = 0, prev = A;
+      for (let i = 1; i <= 64; i++) { const p = bez(c1, c2, i / 64); L += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p; }
+      return L;
+    };
+    const dOf = (c1) => `M${pt(A)} C${pt(c1)} ${pt(mirror(c1))} ${pt(B)}`;
+    // 기록된 체감 비율이 되는 핸들 (바깥 위쪽으로 뻗은 방향에서 길이를 찾음)
+    function ghostFor(r) {
+      if (r <= 1.02) return [A[0] + CHORD / 3, A[1]];
+      const dir = [Math.cos((115 * Math.PI) / 180), -Math.sin((115 * Math.PI) / 180)];
+      let lo = 0, hi = 2000;
+      for (let n = 0; n < 40; n++) {
+        const m = (lo + hi) / 2;
+        if (lenOf(add(A, dir, m)) / CHORD < r) lo = m; else hi = m;
+      }
+      return add(A, dir, lo);
+    }
+    const mmss = (min) => { const s = Math.round(min * 60); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+
+    let sc, actual, r, ghost, c1, matched, dragging, anim, touched, refs;
+
+    // 모든 NODE가 같은 축척을 쓰도록, 가장 크게 부푸는 점선까지 들어오는 상자 하나를 쓴다
+    const VB = [20, 40, 340, 230];
+    SCENES.filter((x) => x.node).forEach((x) => {
+      const a = val(x.actual) || 1, g = ghostFor((val(x.felt) || a) / a);
+      [g, mirror(g)].concat(Array.from({ length: 21 }, (_, i) => bez(g, mirror(g), i / 20))).forEach((q) => {
+        VB[0] = Math.min(VB[0], q[0] - 20); VB[2] = Math.max(VB[2], q[0] + 20); VB[1] = Math.min(VB[1], q[1] - 24);
+      });
+    });
+
+    function setup(scene) {
+      sc = scene;
+      actual = val(sc.actual) || 0;
+      r = (val(sc.felt) || actual) / (actual || 1);
+      ghost = ghostFor(r);
+      c1 = REST.slice();
+      matched = false; dragging = false; touched = false;
+      cancelAnimationFrame(anim);
+
+      const [x0, y0, x1, y1] = VB;
+      const src = sc.guide && sc.guide.source;
+      const hc = src ? COLOR[src] : "var(--ink-3)";
+      const est = isEst(sc.felt) || isEst(sc.actual);
+      const top = Array.from({ length: 41 }, (_, i) => bez(ghost, mirror(ghost), i / 40)).reduce((a, p) => (p[1] < a[1] ? p : a), [0, Infinity]);
+      const estAt = r <= 1.02 ? [(A[0] + B[0]) / 2, A[1] - 10] : [top[0], top[1] - 10];
+
+      pullBox.innerHTML = `
+        <svg viewBox="${f1(x0)} ${f1(y0)} ${f1(x1 - x0)} ${f1(y1 - y0)}" aria-label="핸들을 당겨 체감 시간을 늘려보는 펜툴 곡선">
+          <path d="${dOf(ghost)}" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
+          ${est ? `<text x="${f1(estAt[0])}" y="${f1(estAt[1])}" text-anchor="middle" class="pull-est">추정</text>` : ""}
+          <path class="pull-curve" fill="none" stroke="var(--blue)" stroke-width="4" stroke-linecap="round"/>
+          <g class="pull-h" data-k="0"><line stroke="${hc}" stroke-width="1.6"/><circle class="knob" r="7" fill="${hc}"/><circle class="hit" r="22" fill="transparent"/></g>
+          <g class="pull-h" data-k="1"><line stroke="${hc}" stroke-width="1.6"/><circle class="knob" r="7" fill="${hc}"/><circle class="hit" r="22" fill="transparent"/></g>
+          ${[A, B].map((p) => `<rect x="${p[0] - 6}" y="${p[1] - 6}" width="12" height="12" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/>`).join("")}
+          <text class="pull-hint" x="${A[0] - 4}" y="${A[1] - 26}" text-anchor="end">${esc(TEXT.pullHint)} →</text>
+        </svg>
+        <p class="pull-read"></p>
+        <p class="pull-msg"></p>`;
+      const svg = pullBox.querySelector("svg");
+      refs = {
+        svg,
+        curve: svg.querySelector(".pull-curve"),
+        hs: [...svg.querySelectorAll(".pull-h")],
+        hint: svg.querySelector(".pull-hint"),
+        read: pullBox.querySelector(".pull-read"),
+        msg: pullBox.querySelector(".pull-msg")
+      };
+      refs.hs.forEach((g) => g.addEventListener("pointerdown", (e) => start(e, +g.dataset.k)));
+      draw();
+    }
+
+    function draw() {
+      const c2 = mirror(c1);
+      refs.curve.setAttribute("d", dOf(c1));
+      [[A, c1], [B, c2]].forEach(([a, c], k) => {
+        const g = refs.hs[k];
+        const ln = g.querySelector("line");
+        ln.setAttribute("x1", f1(a[0])); ln.setAttribute("y1", f1(a[1]));
+        ln.setAttribute("x2", f1(c[0])); ln.setAttribute("y2", f1(c[1]));
+        g.querySelectorAll("circle").forEach((ci) => { ci.setAttribute("cx", f1(c[0])); ci.setAttribute("cy", f1(c[1])); });
+      });
+      const felt = matched ? val(sc.felt) : actual * (lenOf(c1) / CHORD);
+      refs.read.innerHTML = `실제 <b>${mmss(actual)}</b><span>/</span>체감 <b>${mmss(felt)}</b>`;
+    }
+
+    function showMsg(text) {
+      refs.msg.innerHTML = `<span class="pull-line">${esc(text)}${isEst(sc.felt) ? EST : ""}</span>${sc.memory ? `<span class="pull-mem">기억: ${esc(sc.memory)}</span>` : ""}`;
+      refs.msg.classList.add("on");
+    }
+    function hideMsg() { refs.msg.classList.remove("on"); }
+
+    function toSvg(e) {
+      const p = refs.svg.createSVGPoint();
+      p.x = e.clientX; p.y = e.clientY;
+      const q = p.matrixTransform(refs.svg.getScreenCTM().inverse());
+      const vb = refs.svg.viewBox.baseVal;
+      return [clamp(q.x, vb.x, vb.x + vb.width), clamp(q.y, vb.y, vb.y + vb.height)];
+    }
+
+    function start(e, k) {
+      e.preventDefault();
+      cancelAnimationFrame(anim);
+      dragging = true;
+      if (!touched) { touched = true; refs.hint.classList.add("off"); }
+      const target = e.currentTarget;
+      try { target.setPointerCapture(e.pointerId); } catch (err) { /* 캡처가 안 돼도 드래그는 계속 */ }
+      const move = (ev) => {
+        const p = toSvg(ev);
+        const raw = k === 0 ? p : mirror(p);   // 반대쪽 핸들은 거울처럼 같이 움직임
+        const ratio = lenOf(raw) / CHORD;
+        if (r > 1.05 && Math.abs(ratio - r) < SNAP) {
+          // 자석처럼 기록된 곡선에 딱 맞춤
+          c1 = ghost.slice();
+          if (!matched) { matched = true; showMsg(TEXT.pullMatch); }
+        } else {
+          c1 = raw;
+          if (matched) { matched = false; hideMsg(); }
+        }
+        draw();
+      };
+      const end = () => {
+        dragging = false;
+        target.removeEventListener("pointermove", move);
+        target.removeEventListener("pointerup", end);
+        target.removeEventListener("pointercancel", end);
+        if (!matched) springBack();
+      };
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerup", end);
+      target.addEventListener("pointercancel", end);
+    }
+
+    // 점선까지 못 당기고 놓으면 천천히 제자리로
+    function springBack() {
+      const from = c1.slice(), t0 = performance.now(), dur = r > 1.05 ? 900 : 450;
+      const step = (now) => {
+        if (dragging) return;
+        const t = clamp((now - t0) / dur), e = 1 - Math.pow(1 - t, 3);
+        c1 = [lerp(from[0], REST[0], e), lerp(from[1], REST[1], e)];
+        draw();
+        if (t < 1) anim = requestAnimationFrame(step);
+        else if (r <= 1.05) showMsg(TEXT.pullSame);  // 체감 = 실제인 장면: 금방 돌아오고 끝
+      };
+      anim = requestAnimationFrame(step);
+    }
+
+    return { setup };
+  })();
+
   // 스크롤 구간: 구간 길이(vh)로만 속도를 표현한다. 스크롤 자체는 건드리지 않음.
   const VH_PER_MIN = 3.2, CLOSE_VH = 170;
   const items = [{ type: "intro", i: 0, len: 70 }];
@@ -426,7 +589,7 @@
   const ride = $("#ride"), stage = $("#stage");
   ride.style.height = `calc(${start + 100} * 1svh)`;
 
-  const close = $("#close"), closeWheel = $("#close-wheel"), card = $("#card"), closeAct = $("#close-act");
+  const close = $("#close"), closeWheel = $("#close-wheel"), card = $("#card"), closeAct = $("#close-act"), closeSide = $("#close-side");
   const howto = $("#howto"), clock = $("#clock"), clockEst = $("#clock-est"), hudLabel = $("#hud-label"), hudTitle = $("#hud-title");
   let cardFor = -1, ticking = false;
 
@@ -483,19 +646,24 @@
           ph.appendChild(img);
         }
         closeAct.innerHTML = `<i class="dot" style="background:var(--ink)"></i><i class="lead"></i>${esc(sc.actionEn || "")}<span class="ko">${esc(sc.action)}</span>`;
+        pull.setup(sc);
       }
       const z = t < 0.15 ? ease(t / 0.15) : t > 0.85 ? ease((1 - t) / 0.15) : 1;
       const b = map.bike.getBoundingClientRect(), s = stage.getBoundingClientRect();
-      const dx = b.left + b.width / 2 - (s.left + s.width / 2), dy = b.top + b.height / 2 - (s.top + s.height / 2);
+      // 바퀴의 원래 자리(변형 전) 중심에서 자전거 위치까지
+      const wx = closeWheel.offsetLeft + closeWheel.offsetWidth / 2, wy = closeWheel.offsetTop + closeWheel.offsetHeight / 2;
+      const dx = b.left + b.width / 2 - (s.left + wx), dy = b.top + b.height / 2 - (s.top + wy);
       closeWheel.style.transform = `translate(${f1(dx * (1 - z))}px, ${f1(dy * (1 - z))}px) scale(${lerp(0.04, 1, z).toFixed(3)})`;
       close.classList.add("on");
       close.style.opacity = clamp(z * 2.5).toFixed(3);
-      closeAct.style.opacity = clamp((z - 0.8) * 5).toFixed(3);
+      closeSide.style.opacity = clamp((z - 0.8) * 5).toFixed(3);
+      pullBox.classList.toggle("live", z > 0.97);
       wheelRot.setAttribute("transform", sc.moving ? `rotate(${f1(t * 1080)})` : "");
       stage.classList.toggle("dim", z > 0.05);
     } else {
       close.classList.remove("on");
       close.style.opacity = 0;
+      pullBox.classList.remove("live");
       stage.classList.remove("dim");
     }
   }
