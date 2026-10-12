@@ -283,7 +283,7 @@
       /* 안내 화살표: 선은 지도 좌표 위에, 머리와 끝 라벨은 화면 크기 고정.
          set(f) = 그려진 비율 (끝까지 그려지면 라벨이 나옴) */
       arrow(pts, color, o = {}) {
-        const g = el("g", { class: "m-arrow" }, arrowLayer);
+        const g = el("g", { class: "m-arrow" + (o.cls ? " " + o.cls : "") }, arrowLayer);
         const w = o.wide ? 9 : o.thin ? 4 : 5.5;
         const halo = el("path", { fill: "none", stroke: "#fff", "stroke-width": w + 4, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, g);
         const line = el("path", { fill: "none", stroke: color, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, g);
@@ -423,6 +423,101 @@
     return { A, B, c1, rest, chord, capY, shape, ghost, RESTR };
   }
 
+
+  /* =========================================================
+     동작 안내 (처음 보는 사람용)
+     조작할 대상 바로 옆에 툴팁 같은 안내 상자 + 반투명 커서(손가락)가 목표까지 한 번 시범.
+     그 경로는 점선 화살표로 남는다. 조작을 시작하면 사라지고, 4초 동안 가만히 있으면 다시 나온다.
+     ========================================================= */
+  const COARSE = window.matchMedia("(pointer: coarse)");
+  const hintText = (key) => { const h = TEXT.hints[key] || ["", ""]; return COARSE.matches ? h[1] || h[0] : h[0]; };
+  const CURSOR_SVG = `<svg viewBox="-2 -2 18 24" width="20" height="26"><path d="M0 0 L0 17 L4.5 13 L7.5 20 L10.5 18.8 L7.5 12 L13 12 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+  const FINGER_SVG = `<svg viewBox="-14 -14 28 28" width="28" height="28"><circle r="11" fill="rgba(20,20,20,.22)" stroke="#111" stroke-width="1.4"/><circle r="3.5" fill="#111"/></svg>`;
+
+  // o: { key, mode: "drag" | "tap", pts(): { from, to } (섹션 기준 px), active(): 아직 조작 전인지 }
+  function makeHint(sec, o) {
+    const box = document.createElement("p");
+    box.className = "hint-box";
+    box.setAttribute("aria-hidden", "true");
+    const ov = document.createElementNS(NS, "svg");
+    ov.setAttribute("class", "hint-ov");
+    ov.setAttribute("aria-hidden", "true");
+    const path = el("path", { class: "hint-path" }, ov), head = el("path", { class: "hint-head" }, ov);
+    const hand = document.createElement("div");
+    hand.className = "hint-hand";
+    sec.append(ov, box, hand);
+    let visible = false, idle = 0, anim = null;
+
+    function show() {
+      if (!visible || !o.active()) return;
+      const q = o.pts();
+      if (!q || !q.from) return;
+      const { from, to } = q, W = sec.clientWidth, H = sec.clientHeight;
+      // 안내 상자: 대상 바로 옆(오른쪽 위), 화면 안으로
+      box.textContent = hintText(o.key);
+      box.classList.add("on");
+      const bw = box.offsetWidth, bh = box.offsetHeight;
+      let x = from[0] + 20, y = from[1] - bh - 16;
+      if (x + bw > W - 12) x = from[0] - bw - 20;
+      if (y < 12) y = from[1] + 24;
+      box.style.left = f1(clamp(x, 12, Math.max(12, W - bw - 12))) + "px";
+      box.style.top = f1(clamp(y, 12, H - bh - 12)) + "px";
+
+      // 시범 경로 = 점선 화살표 (끌기만)
+      ov.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
+      const d = [to[0] - from[0], to[1] - from[1]], L = Math.hypot(d[0], d[1]) || 1;
+      const ctrl = [(from[0] + to[0]) / 2 - (d[1] / L) * L * 0.18, (from[1] + to[1]) / 2 + (d[0] / L) * L * 0.18];
+      const qb = (t) => [0, 1].map((i) => (1 - t) * (1 - t) * from[i] + 2 * (1 - t) * t * ctrl[i] + t * t * to[i]);
+      if (o.mode === "drag" && L > 12) {
+        const a = qb(0.08), b = qb(0.9);
+        path.setAttribute("d", `M${pt(a)} Q${pt(ctrl)} ${pt(b)}`);
+        const tn = norm([b[0] - qb(0.82)[0], b[1] - qb(0.82)[1]]), nv = [-tn[1], tn[0]];
+        head.setAttribute("d", `M${pt(add(b, tn, 9))} L${pt(add(b, nv, 5))} L${pt(add(b, nv, -5))} Z`);
+      } else { path.setAttribute("d", ""); head.setAttribute("d", ""); }
+      ov.classList.add("on");
+
+      // 반투명 커서(손가락)가 목표까지 한 번 시범
+      hand.innerHTML = COARSE.matches ? FINGER_SVG : CURSOR_SVG;
+      hand.classList.toggle("finger", COARSE.matches);
+      if (anim) anim.cancel();
+      const tr = (p, s = 1) => `translate(${f1(p[0])}px, ${f1(p[1])}px) scale(${s})`;
+      if (RM.matches || !hand.animate) { hand.style.transform = tr(to); hand.style.opacity = 0.75; return; }
+      let kf;
+      if (o.mode === "drag") {
+        kf = [{ transform: tr(from), opacity: 0, offset: 0 }, { transform: tr(from), opacity: 0.8, offset: 0.12 }, { transform: tr(from, 0.82), opacity: 0.8, offset: 0.22 }];
+        for (let i = 1; i <= 6; i++) kf.push({ transform: tr(qb(i / 6), 0.82), opacity: 0.8, offset: 0.22 + (i / 6) * 0.53 });
+        kf.push({ transform: tr(to, 1), opacity: 0.8, offset: 0.85 }, { transform: tr(to, 1), opacity: 0, offset: 1 });
+      } else {
+        const st = [to[0] + 56, to[1] + 44];
+        kf = [{ transform: tr(st), opacity: 0, offset: 0 }, { transform: tr(st), opacity: 0.8, offset: 0.15 }, { transform: tr(to), opacity: 0.8, offset: 0.55 },
+          { transform: tr(to, 0.75), opacity: 0.8, offset: 0.65 }, { transform: tr(to, 1), opacity: 0.8, offset: 0.75 }, { transform: tr(to, 1), opacity: 0, offset: 1 }];
+      }
+      hand.classList.add("on");
+      anim = hand.animate(kf, { duration: 2600, easing: "ease-in-out", fill: "forwards" });
+    }
+    function hide() {
+      [box, ov, hand].forEach((e) => e.classList.remove("on"));
+      if (anim) { anim.cancel(); anim = null; }
+    }
+    // 조작을 시작하면 사라지고, 4초 동안 가만히 있으면 다시
+    function activity() {
+      hide();
+      clearTimeout(idle);
+      idle = setTimeout(show, 4000);
+    }
+    sec.addEventListener("pointerdown", activity, true);
+    sec.addEventListener("pointermove", (e) => { if (e.buttons) activity(); }, true);
+    return {
+      setVisible(v) {
+        if (v === visible) return;
+        visible = v;
+        clearTimeout(idle);
+        if (v) show(); else hide();
+      },
+      stop() { visible = false; clearTimeout(idle); hide(); },
+      refresh() { if (visible && box.classList.contains("on")) show(); }
+    };
+  }
 
   /* ---------- 체감 화면 ----------
      ① 거의 일직선 + 짧은 핸들 → ② 오른쪽 핸들을 점선까지 당기면 자석처럼 맞춤
@@ -593,6 +688,7 @@
     }
 
     function play() {
+      hint.stop();
       state = "playing";
       sec.classList.add("playing");
       cancelAnimationFrame(anim);
@@ -618,14 +714,17 @@
       sec.classList.add("done");
     }
 
+    // 안내: 핸들 → 점선 목표
+    const hint = makeHint(sec, { key: "felt", mode: "drag", pts: () => (M ? { from: knobOf(), to: ghostKnob } : null), active: () => state === "idle" });
+
     function render() {
       cancelAnimationFrame(anim);
       layout();
-      if (state === "idle") { base = M.rest.slice(); n = 0; draw(); return; }
+      if (state === "idle") { base = M.rest.slice(); n = 0; draw(); hint.refresh(); return; }
       cancelAnimationFrame(roll);
       finish();
     }
-    return { render };
+    return { sec, render, hint };
   }
 
   /* ---------- 범례 기호 ---------- */
@@ -994,7 +1093,7 @@
       pinkAnchor.from = from;
     }
     if (act === "align") {
-      guideArrow = map.arrow(sp.guide, COLOR[g.source], { wide: true, label: g.label });
+      guideArrow = map.arrow(sp.guide, COLOR[g.source], { wide: true, label: g.label, cls: "r-goal" });
       guideArrow.set(1);
       // 비켜 있는 노랑 경로 (끌 수 있음)
       yel = el("g", { class: "r-yel" }, map.arrowLayer);
@@ -1051,6 +1150,7 @@
       card.classList.add("on");
     }
     function complete() {
+      hint.stop();
       if (state === "done") return;
       state = "done";
       sec.classList.add("done");
@@ -1088,6 +1188,7 @@
 
     /* ---------- 동작 ---------- */
     function snapAdd() {
+      hint.stop();
       blink.g.classList.add("hit");
       const a = map.pin(tip, "r-new-anchor");
       el("rect", { x: -7, y: -7, width: 14, height: 14, fill: YEL }, a.g);
@@ -1095,12 +1196,14 @@
       drawYellow(complete);
     }
     function snapMove() {
+      hint.stop();
       anchorPos = tip.slice(); draw();
       pinkLine.classList.add("gone"); pinkAnchor.g.classList.add("gone");
       blink.g.classList.add("hit");
       drawYellow(complete);
     }
     function snapAlign() {
+      hint.stop();
       off = [0, 0]; draw();
       sec.classList.add("aligned");
       fixArrow.set(1);
@@ -1173,7 +1276,22 @@
       raf = requestAnimationFrame(step);
     });
 
-    return { sec, layout, isDone: () => state !== "idle" };
+    // 안내: 01 깜빡이는 곳 누르기 / 02 분홍 점 → 노란 원 / 03 노란 선 → 분홍 선
+    const toSec = (q) => {
+      const m = svg.getScreenCTM(), b = sec.getBoundingClientRect();
+      if (!m) return q;
+      const r = new DOMPoint(q[0], q[1]).matrixTransform(m);
+      return [r.x - b.left, r.y - b.top];
+    };
+    const midOf = (pts) => pts[Math.floor(pts.length / 2)];
+    const hint = makeHint(sec, {
+      key: act, mode: act === "add" ? "tap" : "drag", active: () => state === "idle",
+      pts: () => act === "add" ? { from: toSec(tip), to: toSec(tip) }
+        : act === "move" ? { from: toSec(anchorPos), to: toSec(tip) }
+        : { from: toSec(add(midOf(sp.fix), off)), to: toSec(midOf(sp.guide)) }
+    });
+    const relayout = layout;
+    return { sec, hint, layout() { relayout(); hint.refresh(); }, isDone: () => state !== "idle" };
   }
 
   /* ---------- 동작 전에는 다음 화면으로 넘어가지 않게 잠깐 고정 ----------
@@ -1389,8 +1507,11 @@
       if (rv) {
         if (en.intersectionRatio >= 0.55 && !rv.isDone()) lock(rv.sec);
         else if (!en.isIntersecting) unlock(rv.sec);
+        rv.hint.setVisible(en.intersectionRatio >= 0.55);
         return;
       }
+      const fv = felts.find((x) => x.sec === en.target);
+      if (fv) { fv.hint.setVisible(en.intersectionRatio >= 0.55); return; }
       const sc = scenes.find((x) => x.sec === en.target);
       if (sc) {
         if (en.intersectionRatio >= 0.55) scenePlay(sc);
@@ -1399,6 +1520,7 @@
     }), { threshold: [0, 0.3, 0.55] });
     scenes.forEach((sc) => io.observe(sc.sec));
     resolves.forEach((r) => io.observe(r.sec));
+    felts.forEach((f) => io.observe(f.sec));
     io.observe($("#legend"));
   } else {
     scenes.forEach(sceneEnd);
