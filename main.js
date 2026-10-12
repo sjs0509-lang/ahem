@@ -956,6 +956,81 @@
     <li class="pull">${GLYPH.pull}<span>${esc(L.pull)}</span></li>
   </ul>`;
 
+  /* ---------- 1-② 펜툴 온보딩 3화면 (표지 다음, 읽는 법 앞) ---------- */
+  const OB = TEXT.onboard || [];
+  // 펜툴 아이콘 (일러스트레이터 툴 모양을 같은 그림체로)
+  const TOOL_ICON = [
+    // 펜 툴 + 점 추가
+    `<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M20 6 L30 22 L26 36 L14 36 L10 22 Z" fill="#fff" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><line x1="20" y1="10" x2="20" y2="25" stroke="var(--ink)" stroke-width="1.4"/><circle cx="20" cy="27" r="2.6" fill="var(--ink)"/><rect x="13" y="36" width="14" height="5" fill="var(--ink)"/><path d="M36 30 v12 M30 36 h12" stroke="var(--yellow)" stroke-width="3" stroke-linecap="round"/></svg>`,
+    // 직접 선택 툴 (흰 화살표) + 점 옮기기
+    `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="31" y="31" width="9" height="9" fill="var(--pink)" stroke="var(--ink)" stroke-width="1.3"/><path d="M36 35 L38 26" stroke="var(--ink)" stroke-width="1" stroke-dasharray="2 2"/><path d="M12 6 L12 32 L18.5 26 L23 36 L27 34.2 L22.6 24.6 L31 24.4 Z" fill="#fff" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+    // 스마트 가이드: 정렬
+    `<svg viewBox="0 0 48 48" aria-hidden="true"><line x1="2" y1="26" x2="46" y2="26" stroke="#13b26b" stroke-width="1.2"/><path d="M8 26 H40" stroke="var(--pink)" stroke-width="6" stroke-linecap="round"/><path d="M8 26 H40" stroke="var(--yellow)" stroke-width="2.6" stroke-linecap="round"/><rect x="15" y="9" width="18" height="9" rx="1.5" fill="#13b26b"/><path d="M19 13.5 l3 3 l6 -6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  ];
+  $("#onboard").innerHTML = OB.map((o, i) => `<section class="screen onboard" id="ob${i + 1}">
+      <p class="ob-text">${o.lines.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
+      ${i < 2 ? `<svg class="ob-svg" role="img" aria-label="${esc(i ? o.sub || "" : o.lines.join(" "))}"></svg>` : ""}
+      ${o.tools ? `<ul class="ob-tools">${o.tools.map((t, k) => `<li>${TOOL_ICON[k] || ""}<b>${esc(t.name)}</b><span>${esc(t.act)}</span><em>${esc(t.verb)}</em></li>`).join("")}</ul>` : ""}
+      ${o.sub ? `<p class="ob-sub${i === 1 ? " key" : ""}">${esc(o.sub)}</p>` : ""}
+    </section>`).join("");
+
+  // ① 두 앵커 + 빨간 직선, 오른쪽 핸들이 저절로 천천히 당겨져 곡선이 부풀었다 펴짐 (반복)
+  // ② 같은 두 점, 늘어난 곡선 + 왼쪽 앵커에 작은 바퀴
+  const obViews = [0, 1].map((i) => {
+    const svg = $(`#ob${i + 1} .ob-svg`);
+    if (!svg) return null;
+    let M = null, raf = 0, on = false, t0 = 0, W = 0, H = 0;
+    const r = i === 0 ? 1.45 : 2.1; // ① 깔끔한 아치로만 부풂 / ② 훨씬 길게 (고리)
+    function layout() {
+      W = svg.clientWidth; H = svg.clientHeight;
+      if (!W) return;
+      const chord = i === 0 ? Math.min(W * 0.56, 360) : Math.min(W * 0.62, 460), A = [(W - chord) / 2, H * 0.78], B = [A[0] + chord, A[1]];
+      // ①은 고리 없이 아치로만 (위 한계 없음), ②는 화면 높이를 넘는 만큼 고리
+      M = feltModel(A, B, { gain: 2.2, topLimit: i === 0 ? -Infinity : 14, knobTop: -Infinity, band: 0, rho: 8 });
+      svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
+      let spokes = "";
+      const rw = 15;
+      for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; spokes += `<line x1="${f1(Math.cos(a) * 2.5)}" y1="${f1(Math.sin(a) * 2.5)}" x2="${f1(Math.cos(a) * rw * 0.86)}" y2="${f1(Math.sin(a) * rw * 0.86)}"/>`; }
+      svg.innerHTML = `<line class="f-ground" x1="0" y1="${f1(A[1])}" x2="${f1(W)}" y2="${f1(A[1])}"/>
+        <line class="f-real" x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(B[0])}" y2="${f1(B[1])}"/>
+        <path class="ob-curve"/>
+        <line class="f-handle ob-h1" stroke="var(--ink-2)"/><circle class="f-knob ob-k1" r="4.5" fill="var(--ink-2)"/>
+        <line class="f-handle ob-h2" stroke="var(--ink-2)"/><circle class="f-knob ob-k2" r="7" fill="var(--ink-2)"/>
+        ${[A, B].map((q) => `<rect class="f-anchor" x="${f1(q[0] - 7)}" y="${f1(q[1] - 7)}" width="14" height="14"/>`).join("")}
+        ${i === 1 ? `<g class="ob-wheel" transform="translate(${f1(A[0])} ${f1(A[1] - rw - 9)})"><circle class="f-roll-tire" r="${rw}"/><g class="f-spokes">${spokes}</g><circle class="f-hub" r="2.5"/></g>` : ""}`;
+      set(i === 1 ? 1 : 0);
+    }
+    // g: 0 = 펴짐, 1 = 다 부풂
+    function set(g) {
+      if (!M) return;
+      const gh = M.ghost(lerp(M.RESTR, r, g));
+      const s = M.shape(gh.knob, gh.n), c1 = M.c1, A = M.A, B = M.B, k2 = gh.knob;
+      $(".ob-curve", svg).setAttribute("d", polyD(s.pts));
+      const at = (sel, a, b) => { const e = $(sel, svg); e.setAttribute("x1", f1(a[0])); e.setAttribute("y1", f1(a[1])); e.setAttribute("x2", f1(b[0])); e.setAttribute("y2", f1(b[1])); };
+      at(".ob-h1", A, c1); at(".ob-h2", B, k2);
+      [[".ob-k1", c1], [".ob-k2", k2]].forEach(([sel, q]) => { const e = $(sel, svg); e.setAttribute("cx", f1(q[0])); e.setAttribute("cy", f1(q[1])); });
+    }
+    function loop(now) {
+      if (!on) return;
+      if (!t0) t0 = now;
+      // 7초에 한 번: 천천히 당겨졌다가, 잠깐 머물고, 다시 펴짐
+      const ph = ((now - t0) / 7000) % 1;
+      const g = ph < 0.4 ? ease(ph / 0.4) : ph < 0.55 ? 1 : ph < 0.9 ? 1 - ease((ph - 0.55) / 0.35) : 0;
+      set(g);
+      raf = requestAnimationFrame(loop);
+    }
+    return {
+      sec: svg.closest(".onboard"), layout,
+      play(v) {
+        if (i !== 0) return;
+        if (v === on) return;
+        on = v; cancelAnimationFrame(raf); t0 = 0;
+        if (v && !RM.matches) raf = requestAnimationFrame(loop); else set(RM.matches ? 0.6 : 0);
+      }
+    };
+  }).filter(Boolean);
+
+
   /* ---------- 지점 지도 장면 ----------
      in : 확대 → 자전거 도착 → 그때의 안내 화살표 (없으면 아무것도 안 나옴)
      out: 사람이 나타나고 노랑 화살표가 실제 길 위에 겹침 → 자전거가 그 길로 출발 */
@@ -1426,6 +1501,7 @@
   function layoutAll() {
     introMap.setBox(introMap.fit(VIEW));
     introMap.setBike(0);
+    obViews.forEach((v) => v.layout());
     frameSets.forEach((f) => f.layout());
     scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
     felts.forEach((f) => f.render());
@@ -1502,6 +1578,8 @@
         rv.hint.setVisible(en.intersectionRatio >= 0.55);
         return;
       }
+      const ov = obViews.find((x) => x.sec === en.target);
+      if (ov) { ov.play(en.isIntersecting); return; }
       const fv = felts.find((x) => x.sec === en.target);
       if (fv) { fv.hint.setVisible(en.intersectionRatio >= 0.55); return; }
       const sc = scenes.find((x) => x.sec === en.target);
@@ -1513,6 +1591,7 @@
     scenes.forEach((sc) => io.observe(sc.sec));
     resolves.forEach((r) => io.observe(r.sec));
     felts.forEach((f) => io.observe(f.sec));
+    obViews.forEach((v) => io.observe(v.sec));
     io.observe($("#legend"));
   } else {
     scenes.forEach(sceneEnd);

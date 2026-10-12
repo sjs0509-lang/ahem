@@ -152,6 +152,21 @@ html.v-lock, html.v-lock body { overflow: hidden; }
   #map-intro .t-wave, #map-intro .t-tree, #map-intro .t-star, #map-intro .t-coast { animation: none; }
 }
 
+/* ---------- 펜툴 온보딩 ---------- */
+.onboard { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: clamp(20px, 4vh, 40px); text-align: center; max-width: 1100px; margin: 0 auto; }
+.ob-text { font-weight: 800; font-size: clamp(21px, 3.2vw, 42px); line-height: 1.35; letter-spacing: -0.035em; }
+.ob-text span { display: block; }
+.ob-sub { font-size: clamp(14px, 1.5vw, 18px); font-weight: 600; color: var(--ink-2); }
+.ob-sub.key { font-size: 13px; color: var(--ink-3); }
+.ob-svg { width: min(100%, 720px); height: clamp(170px, 34svh, 300px); display: block; overflow: visible; }
+.ob-curve { fill: none; stroke: var(--ink); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ob-tools { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 4vw, 48px); width: min(100%, 760px); }
+.ob-tools li { display: grid; justify-items: center; gap: 4px; }
+.ob-tools svg { width: clamp(48px, 7vw, 72px); height: auto; margin-bottom: 6px; }
+.ob-tools b { font-size: clamp(13px, 1.4vw, 16px); }
+.ob-tools span { font-size: clamp(12px, 1.2vw, 14px); color: var(--ink-2); }
+.ob-tools em { font-style: normal; font-weight: 800; font-size: clamp(16px, 1.9vw, 22px); background: linear-gradient(transparent 60%, color-mix(in srgb, var(--yellow) 60%, transparent) 60%); }
+
 /* ---------- 1-② 읽는 법 ---------- */
 .legend { display: flex; align-items: center; justify-content: center; }
 .legend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(22px, 4vh, 40px); font-size: clamp(17px, 2vw, 24px); font-weight: 700; letter-spacing: -0.02em; }
