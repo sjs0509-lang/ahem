@@ -1,4 +1,4 @@
-# STANLEY PARK — 길을 잃었다고 느낀 순간
+# 길을 맞춰보는 과정
 
 스탠리파크를 자전거로 돌다 길을 잃은 세 지점에서, 실제 시간과 느낀 시간을 비교하는 정보디자인 작업.
 
@@ -26,6 +26,7 @@
 - `table` 비교 화면 표 문구 (`guide`, `problem`, `human`, `humanSub`). 줄 이름은 `TEXT.table`
 - `name`(지도·비교용 짧은 이름), `title`(지점 화면 위 이름), `space`(지도 화면 위 공간 한 줄)
 - `at` 지도 위 위치 (경로 한 바퀴를 0~1로 본 값), `scene` 지도에 더 그릴 공간 (fork / forest / road)
+- `TEXT.title` 표지의 큰 제목 (`<title>`·링크 미리보기는 `index.html`)
 - `TEXT` 도입 문장, 읽는 법, 정의, 주제 문장
 - `TEXT.hints` 처음 보는 사람용 동작 안내 문구 [마우스, 휴대폰]
 - `TEXT.onboard` 표지 다음 펜툴 온보딩 3화면 문구 (`lines`, `sub`, 세 번째 화면의 `tools`)

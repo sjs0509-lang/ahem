@@ -770,7 +770,7 @@
   const lineGlyph = (src) => knobGlyph(COLOR[src] || NO_GUIDE, !src);
 
   // 1-① 문장 + 전체 지도
-  $("#intro").innerHTML = `<div class="intro-text">${TEXT.intro.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
+  $("#intro").innerHTML = `<div class="intro-text"><h1 class="intro-title">${esc(TEXT.title)}</h1>${TEXT.intro.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
     <svg class="map" id="map-intro" role="img" aria-label="스탠리파크 한 바퀴 경로와 길을 잃은 세 지점"></svg>
     <p class="place en">${esc(TEXT.place)}</p>`;
   const introMap = buildMap($("#map-intro"));
