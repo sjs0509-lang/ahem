@@ -399,9 +399,9 @@
     const body = o.dress ? `<path class="b-torso helper" d="M-6 ${-100 * h} L6 ${-100 * h} L22 ${-40 * h} L-22 ${-40 * h} Z"/>` : `<path class="b-torso helper" d="M-12 ${-100 * h} L12 ${-100 * h} L14 ${-48 * h} L-14 ${-48 * h} Z"/>`;
     return `<g transform="translate(${x} ${y})">
       <path class="b-limb" d="M-7 ${-44 * h} L-9 0 M7 ${-44 * h} L9 0"/>
+      ${o.hair ? `<path class="b-hair" d="M-15 ${-116 * h} A15 15 0 0 1 15 ${-116 * h} L16 ${-98 * h} L-16 ${-98 * h} Z"/>` : ""}
       ${arm}${body}
       <circle class="b-head" cx="0" cy="${-116 * h}" r="${12 * Math.min(1, h + 0.1)}"/>
-      ${o.hair ? `<path class="b-hair" d="M-12 ${-118 * h} Q-14 ${-96 * h} -4 ${-92 * h} M12 ${-118 * h} Q14 ${-96 * h} 4 ${-92 * h}"/>` : ""}
     </g>`;
   }
   // 당황 표시: 파란 땀방울, 물음표, 구불구불한 짧은 선, 작은 별표 (각자 다른 박자로 살짝 흔들림)
@@ -477,6 +477,72 @@
       later(zoomIn, rm ? 350 : 650);
     } else zoomIn();
     return { done, stop: end };
+  }
+
+  /* =========================================================
+     휴대폰 화면 (NODE 02): 크게 나타나고 말풍선이 하나씩 (data.js의 chat)
+     내 말 = 오른쪽 분홍 말풍선, GPT = 왼쪽 회색 글자. 위에 작게 시각.
+     한 번 누르면 남은 말이 한꺼번에, 한 번 더 누르면 닫힘
+     phoneChat(sec, chat) → { done: Promise, stop() }
+     ========================================================= */
+  const SIGN_SVG = `<svg viewBox="0 0 84 58" aria-hidden="true"><path d="M40 30 V56" stroke="var(--ink)" stroke-width="2.4"/><rect x="4" y="3" width="76" height="30" rx="3" fill="var(--tree-2)" stroke="var(--ink)" stroke-width="1.4"/><path d="M12 18 l8 -6 v4 h12 v4 h-12 v4 Z" fill="#fff"/><path d="M38 13 h34 M38 22 h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`;
+  function phoneChat(sec, chat) {
+    const msgs = (chat && chat.messages) || [];
+    const box = document.createElement("div");
+    box.className = "chat";
+    box.innerHTML = `<div class="chat-phone"><p class="chat-time en">${esc(chat.time || "")}</p><div class="chat-log" aria-live="polite"></div></div>`;
+    sec.appendChild(box);
+    const log = $(".chat-log", box), timers = [];
+    let i = 0, fin, stopped = false;
+    const done = new Promise((res) => { fin = res; });
+    const clear = () => { timers.forEach(clearTimeout); timers.length = 0; };
+    const end = () => { if (stopped) return; stopped = true; clear(); box.remove(); fin(); };
+    const close = () => { clear(); box.classList.add("out"); timers.push(setTimeout(end, RM.matches ? 200 : 380)); };
+    function append(m) {
+      const e = document.createElement("p");
+      e.className = "chat-msg " + (m.from === "me" ? "me" : "gpt");
+      e.innerHTML = (m.sign ? `<span class="chat-sign">${SIGN_SVG}</span>` : "") + esc(m.text || "");
+      log.appendChild(e);
+    }
+    // 읽을 시간: 글자 수에 비례
+    const readMs = (m) => clamp(650 + (m.text || "").length * 48, 1100, 2900);
+    function next() {
+      if (i >= msgs.length) { timers.push(setTimeout(close, 1900)); return; }
+      const m = msgs[i++];
+      append(m);
+      timers.push(setTimeout(next, readMs(m)));
+    }
+    box.addEventListener("click", () => {
+      if (i < msgs.length) { clear(); while (i < msgs.length) append(msgs[i++]); timers.push(setTimeout(close, 2600)); }
+      else close();
+    });
+    timers.push(setTimeout(next, RM.matches ? 150 : 450));
+    return { done, stop: end };
+  }
+
+  /* ---------- 사람 화면: 다시 이어준 사람이 크게 (노랑 말풍선) ---------- */
+  function sayBubble(x, y, text) {
+    const w = text.length * 15 + 34, h = 38, r = 16, x0 = -w / 2, x1 = w / 2, y0 = -h, tx = -w / 2 + 34;
+    const d = `M${x0 + r} ${y0} H${x1 - r} A${r} ${r} 0 0 1 ${x1} ${y0 + r} V${-r} A${r} ${r} 0 0 1 ${x1 - r} 0 H${tx + 10} L${tx - 6} 16 L${tx - 2} 0 H${x0 + r} A${r} ${r} 0 0 1 ${x0} ${-r} V${y0 + r} A${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
+    return `<g transform="translate(${x} ${y})"><g class="who-say"><path class="who-say-bg" d="${d}"/><text class="who-say-t" x="0" y="-13" text-anchor="middle">${esc(text)}</text></g></g>`;
+  }
+  function helperArt(p) {
+    const f = p.fix, say = f.label || "";
+    const trees = `<path class="who-tree" d="${scallop(-168, -46, 26, 9, 0.3)}" style="fill:var(--tree-1)"/><path class="who-tree" d="${scallop(170, -40, 22, 8, 1.1)}" style="fill:var(--tree-3)"/>`;
+    let art = "", bx = 70;
+    if (f.who === "woman") {
+      art = riderBig(-92, 0, { me: true }) + standBig(70, 0, { point: 1, dress: true, hair: true });
+      bx = 96;
+    } else if (f.who === "couple") {
+      art = riderBig(-112, 0, { me: true }) + standBig(38, 0, { dress: true, hair: true }) + standBig(96, 0, { point: 1 });
+      bx = 112;
+    } else {
+      // 앞서 가는 아저씨: 같은 길(노랑) 위를 먼저 달려감
+      const hatch = [0, 1, 2, 3].map((k) => `<line x1="${22 - k * 3}" y1="${-62 + k * 12}" x2="${-2 - k * 3}" y2="${-56 + k * 12}"/>`).join("");
+      art = `<path class="who-path" d="M-150 6 H190"/>` + riderBig(-104, 0, { me: true }) + `<g class="who-speed">${hatch}</g>` + riderBig(92, 0, {});
+      bx = 92;
+    }
+    return `<line class="b-ground" x1="-200" y1="0" x2="200" y2="0"/>${trees}${art}${say ? sayBubble(bx, -148, say) : ""}`;
   }
 
   /* =========================================================
@@ -1165,9 +1231,14 @@
         map.setBike(lerp(from, to, rush(t / ARRIVE)));
         if (guide) guide.set(clamp((t - 2000) / 800));
       },
-      // 도착한 뒤, 안내가 나오기 전: 길을 잃었다
+      // 도착한 뒤, 안내가 나오기 전: 길을 잃었다 (휴대폰 대화가 있으면 → 대화 → 다시 당황)
       run(fx) { sc.fx = fx; return fx.done; },
-      mid() { return sc.run(lostFx(sec, { map })); }
+      mid(live) {
+        const pr = sc.run(lostFx(sec, { map }));
+        if (!p.chat) return pr;
+        return pr.then(() => live() && sc.run(phoneChat(sec, p.chat)))
+          .then(() => live() && sc.run(lostFx(sec, { map, screech: false })));
+      }
     };
     return sc;
   }
@@ -1495,7 +1566,7 @@
   });
   window.addEventListener("scroll", () => { if (lockSec && window.scrollY > lockTop() + 2) window.scrollTo(0, lockTop()); }, { passive: true });
 
-  // 2. 지점마다 같은 순서: 지도(안내) → 체감 → 지도(다시 이어짐)
+  // 2. 지점마다 같은 순서: 지도(도착 → 길을 잃었다 → 그때의 안내) → 체감 언덕 → 사람 → 지도(펜툴 동작 → 출발)
   const host = $("#points");
   const scenes = [], felts = [], resolves = [];
   POINTS.forEach((p, i) => {
@@ -1508,6 +1579,10 @@
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
+      </section>
+      <section class="screen who" id="p${esc(p.id)}-who">${kicker(p)}
+        <figure class="who-fig"><svg class="who-svg" viewBox="-200 -200 400 224" role="img" aria-label="${esc(p.fix.text + (p.fix.label ? ": " + p.fix.label : ""))}">${helperArt(p)}</svg>
+          <figcaption class="who-cap">${esc(p.fix.text)}</figcaption></figure>
       </section>
       <section class="screen loc resolve act-${esc(p.fix.action)}" id="p${esc(p.id)}-out"><div class="loc-head">${kicker(p)}</div>
         <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.fix.tool + " — " + p.fix.text)}"></svg>
@@ -1606,7 +1681,7 @@
       sc.raf = requestAnimationFrame(step);
     });
     tween(0, sc.ARRIVE)
-      .then(() => live() && sc.mid())
+      .then(() => live() && sc.mid(live))
       .then(() => { sc.fx = null; if (live()) return tween(sc.ARRIVE, sc.DUR); });
   }
 
@@ -1694,6 +1769,11 @@
       if (ov) { ov.play(en.isIntersecting); return; }
       const fv = felts.find((x) => x.sec === en.target);
       if (fv) { fv.hint.setVisible(en.intersectionRatio >= 0.55); return; }
+      if (en.target.classList.contains("who")) {
+        if (en.intersectionRatio >= 0.3) en.target.classList.add("in");
+        else if (!en.isIntersecting) en.target.classList.remove("in");
+        return;
+      }
       const sc = scenes.find((x) => x.sec === en.target);
       if (sc) {
         if (en.intersectionRatio >= 0.55) scenePlay(sc);
@@ -1705,8 +1785,9 @@
     felts.forEach((f) => io.observe(f.sec));
     obViews.forEach((v) => io.observe(v.sec));
     io.observe($("#legend"));
+    document.querySelectorAll(".who").forEach((w) => io.observe(w));
   } else {
     scenes.forEach(sceneEnd);
-    $("#legend").classList.add("in");
+    document.querySelectorAll("#legend, .who").forEach((e) => e.classList.add("in"));
   }
 })();

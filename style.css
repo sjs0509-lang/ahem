@@ -205,7 +205,7 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .b-torso { fill: #fff; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
 .b-torso.helper { fill: var(--yellow); }
 .b-head { fill: var(--ink); }
-.b-hair { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.b-hair { fill: var(--ink); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
 .b-eye { fill: #fff; }
 .b-drop { fill: var(--car-3); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
 .b-q { font-family: var(--en); font-size: 30px; fill: var(--ink); }
@@ -216,6 +216,48 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .lost.shake .b-w { animation: b-shake var(--d, .45s) ease-in-out var(--dl, 0s) infinite alternate; }
 @keyframes b-shake { from { transform: translate(-1.5px, 1px) rotate(-6deg); } to { transform: translate(1.5px, -1px) rotate(6deg); } }
 @media (prefers-reduced-motion: reduce) { .lost.shake .b-w { animation: none; } }
+
+/* 휴대폰 화면 (NODE 02) */
+.chat { position: absolute; z-index: 8; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: color-mix(in srgb, var(--bg) 40%, transparent); cursor: pointer; animation: chat-in .45s cubic-bezier(.2, .8, .3, 1.15) both; }
+.chat.out { animation: chat-out .38s ease-in forwards; }
+@keyframes chat-in { from { opacity: 0; transform: scale(.82) translateY(20px); } }
+@keyframes chat-out { to { opacity: 0; transform: scale(.88) translateY(14px); } }
+.chat-phone { display: flex; flex-direction: column; width: min(100%, 340px); height: min(100%, 620px); padding: 12px 14px 18px; background: #fff; border: 3px solid var(--pink); border-radius: 30px; box-shadow: 3px 4px 0 rgba(0, 0, 0, .12); }
+.chat-phone::before { content: ""; align-self: center; width: 64px; height: 6px; border-radius: 3px; background: var(--ink); margin-bottom: 8px; }
+.chat-time { text-align: center; font-size: 11px; color: var(--ink-3); margin-bottom: 10px; }
+.chat-log { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; overflow: hidden; }
+.chat-msg { max-width: 84%; font-size: 15px; line-height: 1.5; animation: msg-in .3s ease-out both; }
+.chat-msg.me { align-self: flex-end; padding: 8px 12px; background: var(--pink-soft); border: 1.5px solid var(--pink); border-radius: 18px 18px 4px 18px; font-weight: 600; color: var(--ink); }
+.chat-msg.gpt { align-self: flex-start; color: var(--ink-3); font-weight: 500; }
+.chat-sign svg { display: block; width: 86px; height: auto; margin: 2px 0 6px; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) {
+  .chat, .chat.out, .chat-msg { animation-duration: .15s; animation-timing-function: linear; }
+  @keyframes chat-in { from { opacity: 0; } }
+  @keyframes chat-out { to { opacity: 0; } }
+  @keyframes msg-in { from { opacity: 0; } }
+}
+
+/* ---------- 사람 화면: 다시 이어준 사람이 크게 ---------- */
+.who { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.who .kicker { position: absolute; top: var(--pad); left: var(--pad); }
+.who-fig { display: grid; justify-items: center; gap: clamp(10px, 2vh, 20px); width: min(100%, 760px); }
+.who-svg { display: block; width: 100%; height: auto; max-height: 64svh; overflow: visible; }
+.who-cap { font-weight: 800; font-size: clamp(17px, 2vw, 24px); letter-spacing: -0.02em; background: linear-gradient(transparent 60%, color-mix(in srgb, var(--yellow) 60%, transparent) 60%); }
+.who-tree { stroke: var(--ink); stroke-width: 1.2; }
+.who-path { fill: none; stroke: var(--yellow); stroke-width: 6; stroke-linecap: round; }
+.who-speed line { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.who-say-bg { fill: var(--yellow); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+.who-say-t { font-family: var(--ko); font-weight: 800; font-size: 16px; fill: var(--ink); }
+.who-fig, .who-say { opacity: 0; }
+.who-say { transform-box: fill-box; transform-origin: 25% 100%; }
+.who.in .who-fig { animation: who-in .6s cubic-bezier(.2, .8, .3, 1.2) forwards; }
+.who.in .who-say { animation: say-in .4s cubic-bezier(.2, .8, .3, 1.4) .55s forwards; }
+@keyframes who-in { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: none; } }
+@keyframes say-in { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .who.in .who-fig, .who.in .who-say { animation: none; opacity: 1; }
+}
 
 /* 지도 위 안내 화살표의 짧은 말 */
 .m-say-bg { fill: #fff; stroke-width: 2.5; }

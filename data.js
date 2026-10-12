@@ -20,11 +20,13 @@
                to:     [x, y] 화살표가 가리키는 곳 (지도 좌표, 길이 없는 곳이면 어긋남)
                along:  0.06 처럼 쓰면 실제 길을 따라 그만큼 겹쳐 그림
                dashed: true면 점선
-     fix     다시 이어준 것 → 지도 위 노랑 화살표 + 체감 화면 끝 주석 카드
-               who:   지도에 나타나는 사람 "woman" / "couple" / "cyclist"
-               label: 화살표 끝의 짧은 말 ("" 이면 라벨 없음)
+     chat    (있으면) 길을 잃은 뒤 휴대폰 화면의 대화. time 위에 작게 쓰는 시각, messages 말풍선 목록
+     fix     다시 이어준 것 → 사람 화면 + 지도 위 노랑 화살표 + 해결 화면 끝 주석 카드
+               who:   나타나는 사람 "woman" / "couple" / "cyclist" (사람 화면에 크게, 지도에 작게)
+               label: 사람 화면의 노랑 말풍선 + 지도 화살표 끝의 짧은 말 ("" 이면 말풍선 없음)
+               text:  사람 화면 아래 한 줄이자 카드의 "무엇이"
                along: 실제 길을 따라 겹치는 길이
-               text:  카드의 "무엇이" / line: 카드의 한 줄 문장
+               line:  카드의 한 줄 문장
                action: 해결 화면의 펜툴 동작 "add" 점 추가 / "move" 점 옮기기 / "align" 정렬
                tool:   그 동작 중 커서 옆에 뜨는 툴 이름
 
@@ -141,6 +143,19 @@ const POINTS = [
     space: "숲",
     note: "4:33 Lumberman's Arch에서 ChatGPT에게 질문 · 반납까지 1시간, 배터리 10%",
     guide: { source: "phone", label: "이 길로 가세요", to: [578, 400], dashed: true },
+    // 길을 잃은 뒤 휴대폰 화면: 말풍선이 하나씩 나옴 (me = 오른쪽 분홍 말풍선 / gpt = 왼쪽 회색 글자)
+    // sign: true 면 말 앞에 작은 표지판 그림
+    chat: {
+      time: "4:33 PM",
+      messages: [
+        { from: "me", text: "다시 렌탈샵으로 돌아가려면 한 바퀴 돌아야 하나요..?" },
+        { from: "gpt", text: "한 바퀴 다 돌 필요는 없어! 중간에 공원 안쪽 길로 빠질 수 있어." },
+        { from: "me", text: "20분 내로 가야 해ㅜ 중간에 빠질 수 있어?" },
+        { from: "gpt", text: "Second Beach 쪽에서 공원 안쪽으로 빠져 Georgia/Denman 방향으로 돌아오면 돼." },
+        { from: "me", sign: true, text: "여기야" },
+        { from: "gpt", text: "City Centre 1km 왼쪽 방향으로 가!" }
+      ]
+    },
     fix: {
       source: "person", who: "couple", label: "이쪽이에요", along: 0.08,
       action: "move", tool: "직접 선택 툴: 점 옮기기",
