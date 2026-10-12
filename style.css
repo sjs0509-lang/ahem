@@ -435,8 +435,37 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .mn-words .yes dt span { background: linear-gradient(transparent 60%, color-mix(in srgb, var(--yellow) 60%, transparent) 60%); }
 .mn-line { font-size: clamp(16px, 1.9vw, 22px); font-weight: 600; line-height: 1.6; color: var(--ink-2); max-width: 34em; }
 
+/* 인사이트 꾸밈: 말 옆의 작은 그림 (조용히 나타나 살짝 떠 있음 — 게임 연출 아님) */
+.ic { display: inline-block; width: 1.2em; height: 1.2em; margin-left: .28em; vertical-align: -0.24em; opacity: 0; transform: translateY(8px); }
+.nw { white-space: nowrap; font-weight: inherit; }
+.ic svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.in .ic { animation: ic-in .7s ease-out calc(.35s + var(--i) * .22s) forwards, ic-float 3.2s ease-in-out calc(1s + var(--i) * .3s) infinite alternate; }
+@keyframes ic-in { to { opacity: 1; transform: none; } }
+@keyframes ic-float { from { translate: 0 0; } to { translate: 0 -3px; } }
+.mn-words div { align-items: center; }
+.mn-words .ic { flex: none; width: clamp(28px, 3vw, 38px); height: clamp(28px, 3vw, 38px); margin: 0; }
+.mn-things { display: flex; gap: clamp(10px, 1.6vw, 18px); margin-bottom: -12px; }
+.mn-things .ic { width: clamp(34px, 4vw, 48px); height: clamp(34px, 4vw, 48px); margin: 0; }
+/* 마지막 화면 아래: 자전거가 대여점으로 돌아오는 땅 */
+.land { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(90px, 16svh, 140px); border-bottom: 0; pointer-events: none; }
+.land::before { content: ""; position: absolute; left: 0; right: 0; bottom: 22px; border-top: 1.5px solid var(--ink); }
+.land span { position: absolute; left: var(--x); bottom: calc(22px + var(--b)); width: var(--s); height: var(--s); margin-left: calc(var(--s) / -2); opacity: 0; transform: translateY(10px); }
+.land span i, .land span svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.land .land-wave { bottom: calc(14px + var(--b)); }
+.thesis.in .land span { animation: ic-in .8s ease-out calc(.2s + var(--i) * .12s) forwards; }
+.thesis.in .land .land-tree i { transform-origin: center bottom; animation: land-tree 5s ease-in-out calc(var(--i) * -.9s) infinite; }
+.thesis.in .land .land-bike i { animation: land-bike 1.4s ease-in-out infinite alternate; }
+@keyframes land-tree { 0%, 100% { transform: none; } 30% { transform: scale(1.04, .96) rotate(-1.5deg); } 60% { transform: scale(.97, 1.04) rotate(1.5deg); } }
+@keyframes land-bike { from { transform: translate(-4px, 0); } to { transform: translate(4px, -2px); } }
+@media (max-width: 640px) { .land span { width: calc(var(--s) * .66); height: calc(var(--s) * .66); margin-left: calc(var(--s) * -.33); } }
+@media (prefers-reduced-motion: reduce) {
+  .in .ic, .thesis.in .land span, .thesis.in .land span i { animation: none; }
+  .ic, .land span { opacity: 1; transform: none; }
+}
+
 /* ---------- 3-⑤ 깨달음 ---------- */
-.thesis { display: flex; flex-direction: column; justify-content: center; gap: clamp(28px, 6vh, 56px); max-width: 1100px; margin: 0 auto; }
+.thesis { display: flex; flex-direction: column; justify-content: center; gap: clamp(28px, 6vh, 56px); max-width: 1100px; margin: 0 auto; padding-bottom: clamp(110px, 18svh, 160px); }
+.thesis > p { position: relative; z-index: 1; }
 .after { padding-top: clamp(18px, 3vh, 28px); border-top: 1.5px solid var(--ink); font-size: clamp(16px, 1.9vw, 22px); font-weight: 600; line-height: 1.6; color: var(--ink-2); }
 .after span { display: block; }
 .big { font-weight: 800; font-size: clamp(24px, 4.2vw, 56px); line-height: 1.32; letter-spacing: -0.035em; }

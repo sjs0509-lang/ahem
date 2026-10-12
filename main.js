@@ -1671,14 +1671,48 @@
     </div>`;
   $("#photos").innerHTML = timeline;
   // 3-④ 깨달음: 마지막 문장
+  /* ---------- 인사이트 화면 꾸밈: 앞에서 쓴 요소를 말 옆에 작게 ----------
+     data.js에서 문장마다 icons: ["phone", "bubble"] 처럼 고른다 */
+  const svg48 = (inner) => `<svg viewBox="0 0 48 48" aria-hidden="true">${inner}</svg>`;
+  const ICON = {
+    phone: svg48(`<rect x="13" y="4" width="22" height="40" rx="5" fill="#fff" stroke="var(--pink)" stroke-width="3"/><path d="M18 14 h12 M18 20 h8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/><rect x="21" y="36" width="6" height="2.4" rx="1.2" fill="var(--pink)"/>`),
+    bubble: svg48(`<path d="M8 9 h32 a5 5 0 0 1 5 5 v13 a5 5 0 0 1 -5 5 h-18 l-9 8 v-8 h-5 a5 5 0 0 1 -5 -5 v-13 a5 5 0 0 1 5 -5 z" fill="var(--yellow)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 20.5 h20" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>`),
+    map: svg48(`<rect x="5" y="9" width="38" height="30" rx="2" fill="var(--sea)" stroke="var(--ink)" stroke-width="1.6"/><path d="M5 27 C 16 18, 22 34, 43 22 V39 H5 Z" fill="var(--grass)" stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 33 C 18 30, 24 21, 35 18" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/><circle cx="36" cy="17" r="3.4" fill="var(--red)" stroke="#fff" stroke-width="1.2"/>`),
+    tree: svg48(`<path d="${scallop(24, 22, 17, 9, 0.3)}" fill="var(--tree-2)" stroke="var(--ink)" stroke-width="1.4"/><path d="M24 39 v6" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>`),
+    align: TOOL_ICON[2],
+    // 이어지던 길이 끝점에서 끊기고, 그다음은 공간에만 있는 길(모래색)
+    broken: svg48(`<path d="M3 32 C 9 32, 13 26, 19 26" fill="none" stroke="var(--ink)" stroke-width="3.2" stroke-linecap="round"/><path d="M29 26 C 35 26, 39 20, 45 18" fill="none" stroke="var(--ink-3)" stroke-width="2.4" stroke-dasharray="1 4.5" stroke-linecap="round"/><rect x="16" y="22.5" width="7" height="7" fill="#fff" stroke="var(--ink)" stroke-width="1.6"/><path d="M25 19 l3 -4 M26 24 h4" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round"/>`),
+    lost: svg48(`<circle cx="20" cy="29" r="11" fill="var(--ink)"/><circle cx="23.5" cy="27" r="1.8" fill="#fff"/><circle cx="28.5" cy="27" r="1.8" fill="#fff"/><text x="31" y="17" font-family="Archivo Black, Arial Black, sans-serif" font-size="17" fill="var(--ink)">?</text><path transform="translate(8 15) scale(.6)" d="M0 -9 C3 -4 7 0 7 4 A7 7 0 0 1 -7 4 C-7 0 -3 -4 0 -9 Z" fill="var(--car-3)" stroke="var(--ink)" stroke-width="1.6"/>`),
+    hill: svg48(`<line x1="6" y1="40" x2="42" y2="40" stroke="var(--red)" stroke-width="3"/><path d="M6 40 C 12 2, 36 2, 42 40" fill="none" stroke="var(--ink)" stroke-width="2.4"/><rect x="3" y="37" width="6" height="6" fill="#fff" stroke="var(--ink)" stroke-width="1.3"/><rect x="39" y="37" width="6" height="6" fill="#fff" stroke="var(--ink)" stroke-width="1.3"/>`),
+    drop: svg48([[18, 24, 1.3], [33, 32, 0.9]].map(([x, y, s]) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 -9 C3 -4 7 0 7 4 A7 7 0 0 1 -7 4 C-7 0 -3 -4 0 -9 Z" fill="var(--car-3)" stroke="var(--ink)" stroke-width="1.3"/>`).join("")),
+    // 맞히다: 과녁 (정답 하나를 골라냄)
+    target: svg48(`<circle cx="24" cy="24" r="18" fill="#fff" stroke="var(--ink-3)" stroke-width="2"/><circle cx="24" cy="24" r="11" fill="none" stroke="var(--ink-3)" stroke-width="2"/><circle cx="24" cy="24" r="4" fill="var(--ink-3)"/>`)
+  };
+  let icN = 0;
+  const icons = (list) => (list || []).map((k) => (ICON[k] ? `<i class="ic" style="--i:${icN++}">${ICON[k]}</i>` : "")).join("");
+  // 문장 줄: "글" 또는 { text, icons }
+  const lineOf = (l) => (typeof l === "string" ? { text: l } : l);
+  // 그림은 마지막 낱말에 붙여서 그림만 다음 줄로 떨어지지 않게
+  const lineHtml = (l) => {
+    const o = lineOf(l), ic = icons(o.icons), cut = o.text.lastIndexOf(" ");
+    if (!ic) return `<span>${esc(o.text)}</span>`;
+    return `<span>${esc(o.text.slice(0, cut + 1))}<b class="nw">${esc(o.text.slice(cut + 1))}${ic}</b></span>`;
+  };
+
   // 3-④ 맞추다: 길을 맞힌 게 아니라, 정보들을 서로 맞춰본 것
   const MN = TEXT.meaning;
+  icN = 0;
   $("#meaning").innerHTML = `<p class="mn-title">${MN.title.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
-    <dl class="mn-words">${MN.words.map((w) => `<div class="${w.no ? "no" : "yes"}"><dt><span>${esc(w.word)}</span></dt><dd>${esc(w.mean)}</dd></div>`).join("")}</dl>
+    <dl class="mn-words">${MN.words.map((w) => `<div class="${w.no ? "no" : "yes"}">${icons([w.icon])}<dt><span>${esc(w.word)}</span></dt><dd>${esc(w.mean)}</dd></div>`).join("")}</dl>
+    <div class="mn-things">${icons(MN.things)}</div>
     <p class="mn-line">${esc(MN.line)}</p>`;
-  // 3-⑤ 마지막 문장 + 익숙함과 불안
-  $("#thesis").innerHTML = `<p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
-    <p class="after">${(TEXT.thesisAfter || []).map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
+
+  // 3-⑤ 마지막 문장 + 익숙함과 불안. 아래에는 자전거가 대여점으로 돌아오는 땅
+  icN = 0;
+  const LAND = [["wave", 5, 0, 54], ["wave", 15, 14, 44], ["tree", 27, 0, 64], ["tree", 34, 0, 44], ["sparkle", 47, 56, 26], ["tree", 62, 0, 52], ["bike", 79, 0, 60], ["shop", 91, 0, 70]];
+  $("#thesis").innerHTML = `<p class="big">${TEXT.thesis.map(lineHtml).join("")}</p>
+    <p class="after">${(TEXT.thesisAfter || []).map(lineHtml).join("")}</p>
+    <div class="land" aria-hidden="true">${LAND.map(([k, x, b, s], i) => `<span class="land-${k}" style="--x:${x}%;--b:${b}px;--s:${s}px;--i:${i}"><i>${DECO[k](i)}</i></span>`).join("")}</div>`;
 
   /* =========================================================
      지도 장면 재생: 화면에 들어오면 처음부터, 나가면 처음 상태로
@@ -1794,7 +1828,7 @@
       if (ov) { ov.play(en.isIntersecting); return; }
       const fv = felts.find((x) => x.sec === en.target);
       if (fv) { fv.hint.setVisible(en.intersectionRatio >= 0.55); return; }
-      if (en.target.matches(".who, .mission")) {
+      if (en.target.matches(".who, .mission, .meaning, .thesis")) {
         if (en.intersectionRatio >= 0.3) en.target.classList.add("in");
         else if (!en.isIntersecting) en.target.classList.remove("in");
         return;
@@ -1810,9 +1844,9 @@
     felts.forEach((f) => io.observe(f.sec));
     obViews.forEach((v) => io.observe(v.sec));
     io.observe($("#legend"));
-    document.querySelectorAll(".who, .mission").forEach((w) => io.observe(w));
+    document.querySelectorAll(".who, .mission, .meaning, .thesis").forEach((w) => io.observe(w));
   } else {
     scenes.forEach(sceneEnd);
-    document.querySelectorAll("#legend, .who, .mission").forEach((e) => e.classList.add("in"));
+    document.querySelectorAll("#legend, .who, .mission, .meaning, .thesis").forEach((e) => e.classList.add("in"));
   }
 })();
