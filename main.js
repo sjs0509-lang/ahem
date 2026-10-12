@@ -680,6 +680,154 @@
     <p class="place en">${esc(TEXT.place)}</p>`;
   const introMap = buildMap($("#map-intro"));
 
+  /* =========================================================
+     지도 위 사진 프레임: 찍은 곳에 점 + 가는 선으로 연결
+     여유로운 구간은 크게, 돌아오는 숲길은 작게, 고속도로는 빈 점선 프레임
+     ========================================================= */
+  const VW = TEXT.viewer;
+  const photoTime = (ph) => (ph.time ? ph.time + (ph.timeEst ? " 추정" : "") : "시각 ?");
+  const FRAME = { large: [58, 72], small: [38, 48], phone: [32, 66], none: [48, 48] };
+  const frameKind = (ph) => (ph.kind === "phone" || ph.kind === "none" ? ph.kind : ph.size === "small" ? "small" : "large");
+
+  // 프레임 그림 (화면 px 단위, 가운데 = 0,0)
+  function frameSvg(ph, i) {
+    const k = frameKind(ph), [w, h] = FRAME[k], x = -w / 2, y = -h / 2;
+    const src = ph.file ? `photos/${esc(ph.file)}` : "";
+    const ph0 = (px, py, pw, phh) => `<rect class="pf-ph" x="${px}" y="${py}" width="${pw}" height="${phh}"/>
+      <text class="pf-file" x="${px + pw / 2}" y="${py + phh / 2 + 2}" text-anchor="middle">${esc(ph.file)}</text>
+      <image data-src="${src}" x="${px}" y="${py}" width="${pw}" height="${phh}" preserveAspectRatio="xMidYMid slice"/>`;
+    if (k === "none") {
+      return `<rect class="pf-none" x="${x}" y="${y}" width="${w}" height="${h}"/>
+        <text class="pf-empty" x="0" y="3" text-anchor="middle">${esc(VW.empty)}</text>`;
+    }
+    if (k === "phone") {
+      return `<rect class="pf-phone" x="${x}" y="${y}" width="${w}" height="${h - 12}" rx="6"/>${ph0(x + 4, y + 7, w - 8, h - 26)}
+        <text class="pf-time" x="0" y="${y + h - 1}" text-anchor="middle">${esc(photoTime(ph))}</text>`;
+    }
+    const m = k === "small" ? 3 : 4, pw = w - m * 2;
+    const rot = i % 2 ? 3 : -3;
+    return `<g transform="rotate(${rot})"><rect class="pf-card" x="${x}" y="${y}" width="${w}" height="${h}"/>${ph0(x + m, y + m, pw, pw)}
+      <text class="pf-time${k === "small" ? " sm" : ""}" x="0" y="${y + h - (k === "small" ? 4 : 6)}" text-anchor="middle">${esc(photoTime(ph))}</text></g>`;
+  }
+
+  function photoFrames(map) {
+    const svg = map.svg;
+    const leads = el("g", { class: "pf-leads" }, svg), dots = el("g", {}, svg), layer = el("g", {}, svg);
+    const items = PHOTOS.map((ph, i) => {
+      const s = ph.at * LOOP, q = P(s);
+      const lead = el("line", { class: "pf-lead" }, leads);
+      const dot = el("circle", { class: "pf-dot" }, dots);
+      const g = el("g", { class: "pf", tabindex: 0, role: "button", "aria-label": `${photoTime(ph)} ${ph.place}` }, layer);
+      g.innerHTML = frameSvg(ph, i);
+      const im = $("image", g);
+      if (im && ph.file) { const pre = new Image(); pre.onload = () => im.setAttribute("href", im.dataset.src); pre.src = im.dataset.src; }
+      g.addEventListener("click", () => viewer.open(ph));
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); viewer.open(ph); } });
+      return { ph, s, q, g, lead, dot, wh: FRAME[frameKind(ph)] };
+    });
+
+    // 찍은 곳 바깥쪽에 놓고, 서로·지점 번호와 겹치지 않게 밀어낸다 (화면 px에서 계산)
+    function layout() {
+      const W = svg.clientWidth, H = svg.clientHeight, vb = svg.viewBox.baseVal;
+      if (!W || !vb.width) return;
+      const k = vb.width / W, sc = W < 640 ? 0.66 : 1, gap = 6 * sc;
+      const toPx = (p) => [(p[0] - vb.x) / k, (p[1] - vb.y) / k];
+      const n = items.map((it) => {
+        const a = toPx(it.q), o = outward(it.s), w = it.wh[0] * sc, h = it.wh[1] * sc, d = 30 * sc + Math.max(w, h) / 2;
+        return { a, w, h, hx: a[0] + o[0] * d, hy: a[1] + o[1] * d, x: a[0] + o[0] * d, y: a[1] + o[1] * d };
+      });
+      // 피해야 할 것: 지점 번호와 이름, 경로 선, 찍은 곳 점
+      const blocks = [];
+      POINTS.forEach((p) => {
+        const s = p.at * LOOP, a = toPx(P(s)), o = outward(s);
+        blocks.push({ x: a[0], y: a[1], w: 34, h: 34 }, { x: a[0] + o[0] * 28, y: a[1] + o[1] * 28, w: 64, h: 22 });
+      });
+      const st = toPx(SAMPLES[0]);
+      blocks.push({ x: st[0] + 50, y: st[1] + 18, w: 84, h: 20 }); // 자전거 대여점 이름
+      for (let i = 0; i < SAMPLES.length; i += 6) { const a = toPx(SAMPLES[i]); blocks.push({ x: a[0], y: a[1], w: 6, h: 6 }); }
+      n.forEach((m) => blocks.push({ x: m.a[0], y: m.a[1], w: 10, h: 10 }));
+      const push = (m, b, both) => {
+        const dx = m.x - b.x, dy = m.y - b.y;
+        const ox = (m.w + b.w) / 2 + gap - Math.abs(dx), oy = (m.h + b.h) / 2 + gap - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) return;
+        const f = both ? 0.5 : 1;
+        const sy = (dy >= 0 ? 1 : -1) * oy * f, yOut = m.y + sy < m.h / 2 + 6 || m.y + sy > H - m.h / 2 - 6;
+        // 위아래로 밀 자리가 없으면 옆으로
+        if (ox < oy || yOut) { const s = (dx >= 0 ? 1 : -1) * ox * f; m.x += s; if (both) b.x -= s; }
+        else { m.y += sy; if (both) b.y -= sy; }
+      };
+      for (let it = 0; it < 240; it++) {
+        for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) push(n[i], n[j], true);
+        n.forEach((m) => {
+          m.x += (m.hx - m.x) * 0.02; m.y += (m.hy - m.y) * 0.02;
+          blocks.forEach((b) => push(m, b, false));
+          m.x = clamp(m.x, m.w / 2 + 6, W - m.w / 2 - 6); m.y = clamp(m.y, m.h / 2 + 6, H - m.h / 2 - 6);
+        });
+      }
+      items.forEach((itm, i) => {
+        const c = [vb.x + n[i].x * k, vb.y + n[i].y * k];
+        itm.g.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])}) scale(${(k * sc).toFixed(4)})`);
+        itm.lead.setAttribute("x1", f1(itm.q[0])); itm.lead.setAttribute("y1", f1(itm.q[1]));
+        itm.lead.setAttribute("x2", f1(c[0])); itm.lead.setAttribute("y2", f1(c[1]));
+        itm.dot.setAttribute("cx", f1(itm.q[0])); itm.dot.setAttribute("cy", f1(itm.q[1])); itm.dot.setAttribute("r", f1(3.2 * k));
+      });
+    }
+    return { layout };
+  }
+
+  /* ---------- 사진 보기: 아이폰 사진 정보처럼 ----------
+     가운데 크게 → 위로 밀면 아래에 시각·장소·작은 지도 핀 → 바깥이나 X로 닫기 */
+  const viewer = (function () {
+    const box = document.createElement("div");
+    box.className = "viewer";
+    box.hidden = true;
+    box.innerHTML = `<button class="v-close" type="button" aria-label="${esc(VW.close)}">×</button>
+      <div class="v-scroll">
+        <div class="v-stage"><figure class="v-photo"><span class="v-file"></span><img alt=""></figure>
+          <p class="v-none"></p><p class="v-more">⌃ ${esc(VW.more)}</p></div>
+        <div class="v-info"><p class="v-time"></p><p class="v-place"></p><svg class="v-map" aria-hidden="true"></svg></div>
+      </div>`;
+    document.body.appendChild(box);
+    const scroll = $(".v-scroll", box), fig = $(".v-photo", box), img = $("img", box);
+    let mini = null, pin = null, last = null;
+    img.addEventListener("load", () => fig.classList.add("loaded"));
+    img.addEventListener("error", () => fig.classList.remove("loaded"));
+
+    function open(ph) {
+      last = document.activeElement;
+      const none = ph.kind === "none";
+      box.classList.toggle("is-none", none);
+      box.classList.toggle("is-phone", ph.kind === "phone");
+      $(".v-none", box).textContent = none ? VW.noPhoto : "";
+      fig.classList.remove("loaded");
+      $(".v-file", box).textContent = ph.file || "";
+      if (!none && ph.file) img.src = "photos/" + ph.file; else img.removeAttribute("src");
+      $(".v-time", box).textContent = photoTime(ph);
+      $(".v-place", box).textContent = ph.place;
+      box.hidden = false;
+      document.documentElement.classList.add("v-lock");
+      scroll.scrollTop = 0;
+      if (!none) {
+        if (!mini) { mini = buildMap($(".v-map", box)); pin = el("circle", { class: "v-pin" }, mini.svg); }
+        const q = P(ph.at * LOOP), b = mini.fit([q[0] - 200, q[1] - 135, 400, 270]);
+        mini.setBox(b);
+        pin.setAttribute("cx", f1(q[0])); pin.setAttribute("cy", f1(q[1])); pin.setAttribute("r", f1((b[2] / (mini.svg.clientWidth || 300)) * 8));
+      }
+      $(".v-close", box).focus();
+    }
+    function close() {
+      box.hidden = true;
+      document.documentElement.classList.remove("v-lock");
+      if (last && last.focus) last.focus();
+    }
+    $(".v-close", box).addEventListener("click", close);
+    // 사진·정보 바깥을 누르면 닫힘
+    box.addEventListener("click", (e) => { if (!e.target.closest(".v-photo, .v-info, .v-close")) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !box.hidden) close(); });
+    return { open };
+  })();
+  const introFrames = photoFrames(introMap);
+
   // 1-② 읽는 법
   const L = TEXT.legend;
   $("#legend").innerHTML = `<ul class="legend-list">
@@ -764,7 +912,7 @@
     const wrap = document.createElement("div");
     wrap.className = "point";
     wrap.innerHTML = `
-      <section class="screen loc" id="p${esc(p.id)}-in"><div class="loc-head">${kicker(p)}<p class="loc-space">${esc(p.space)}</p></div>
+      <section class="screen loc" id="p${esc(p.id)}-in"><div class="loc-head">${kicker(p)}<p class="loc-space">${esc(p.space)}</p>${p.note ? `<p class="loc-space">${esc(p.note)}</p>` : ""}</div>
         <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.space)}"></svg>${photo}</section>
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
@@ -804,6 +952,7 @@
       ${row("problem", (p) => `<span>${esc(p.table.problem)}</span>`)}
       ${row("time", (p) => `<span><b class="r">${val(p.actual)}</b> → <b>${val(p.felt)}분</b></span>`)}
       ${row("human", (p) => `${miniScene(p, "human")}<span>${esc(p.table.human)}</span>`)}
+      ${row("photos", (p) => `<span>${esc(p.table.photos || "")}</span>`)}
     </div>`;
 
   function drawCompare() {
@@ -848,6 +997,7 @@
   function layoutAll() {
     introMap.setBox(introMap.fit(VIEW));
     introMap.setBike(0);
+    introFrames.layout();
     scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
     felts.forEach((f) => f.render());
     drawCompare();

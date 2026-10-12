@@ -81,6 +81,42 @@ p, dl, dd, figure { margin: 0; }
 .m-start .m-name { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
 .m-point.dim { opacity: 0.35; }
 
+/* 지도 위 사진 프레임 */
+.pf { cursor: pointer; outline: none; }
+.pf:focus-visible .pf-card, .pf:focus-visible .pf-phone, .pf:focus-visible .pf-none { stroke-width: 2.5; }
+.pf-card { fill: #fff; stroke: var(--ink); stroke-width: 1; }
+.pf-ph { fill: #dedbd3; }
+.pf-file { font-family: var(--ko); font-size: 7px; fill: #8f8b82; }
+.pf-time { font-family: var(--en); font-size: 7.5px; fill: var(--ink); letter-spacing: 0.02em; }
+.pf-time.sm { font-size: 6px; }
+.pf-phone { fill: #fff; stroke: var(--pink); stroke-width: 2; }
+.pf-none { fill: color-mix(in srgb, #fff 55%, transparent); stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; }
+.pf-empty { font-family: var(--ko); font-weight: 700; font-size: 9px; fill: var(--ink-2); }
+.pf-lead { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.pf-dot { fill: var(--ink); }
+
+/* 사진 보기 */
+.viewer { position: fixed; inset: 0; z-index: 50; background: rgba(18, 18, 16, 0.9); color: #fff; }
+.viewer[hidden] { display: none; }
+html.v-lock, html.v-lock body { overflow: hidden; }
+.v-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 28px; line-height: 1; cursor: pointer; }
+.v-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.v-stage { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 60px 16px 24px; }
+.v-photo { position: relative; margin: 0; width: min(86vw, 68svh); aspect-ratio: 1 / 1; background: #dedbd3; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.viewer.is-phone .v-photo { width: auto; height: min(72svh, 150vw); aspect-ratio: 9 / 19.5; border: 3px solid var(--pink); border-radius: 22px; }
+.v-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+.v-photo.loaded img { display: block; }
+.v-file { font-size: 13px; color: #8f8b82; }
+.v-more { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.v-none { display: none; font-size: clamp(17px, 2.4vw, 24px); font-weight: 700; }
+.viewer.is-none .v-photo, .viewer.is-none .v-more, .viewer.is-none .v-info { display: none; }
+.viewer.is-none .v-none { display: block; }
+.v-info { width: min(560px, 100%); margin: 0 auto; padding: 22px 20px 32px; background: var(--bg); color: var(--ink); border-radius: 16px 16px 0 0; min-height: 50svh; }
+.v-time { font-family: var(--en); font-size: 15px; letter-spacing: 0.02em; }
+.v-place { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; margin-top: 2px; }
+.v-map { display: block; width: 100%; height: 220px; margin-top: 16px; border: 1.2px solid var(--ink); border-radius: 10px; }
+.v-pin { fill: var(--red); stroke: #fff; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+
 /* ---------- 1-② 읽는 법 ---------- */
 .legend { display: flex; align-items: center; justify-content: center; }
 .legend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(22px, 4vh, 40px); font-size: clamp(17px, 2vw, 24px); font-weight: 700; letter-spacing: -0.02em; }
