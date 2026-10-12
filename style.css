@@ -188,6 +188,35 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .loc-space { font-size: 13px; font-weight: 700; color: var(--ink-2); background: var(--bg); padding: 2px 8px; border-radius: 2px; }
 .loc .map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
+/* ---------- 길을 잃었다: 끼익 정지 + 당황한 나 ---------- */
+.m-speed line { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.m-skid { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; opacity: .55; }
+.m-burst { fill: #fff; stroke: var(--ink); stroke-width: 1.3; stroke-linejoin: round; }
+.lost { position: absolute; z-index: 8; left: 50%; top: 50%; width: min(82vw, 58svh, 440px); aspect-ratio: 220 / 210; transform-origin: center; translate: -50% -50%; opacity: 0; pointer-events: none; cursor: pointer; }
+.lost.on { pointer-events: auto; }
+.lost svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.b-bg { fill: var(--bg); stroke: var(--ink); stroke-width: 1.5; }
+.b-ground { stroke: var(--ink); stroke-width: 1.5; }
+.b-tire { fill: #fff; stroke: var(--ink); stroke-width: 3; }
+.b-spoke { fill: none; stroke: var(--ink); stroke-width: .9; }
+.b-hub { fill: var(--blk-2); stroke: var(--ink); stroke-width: 1.2; }
+.b-frame { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.b-limb { fill: none; stroke: var(--ink); stroke-width: 3.4; stroke-linejoin: round; stroke-linecap: round; }
+.b-torso { fill: #fff; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.b-torso.helper { fill: var(--yellow); }
+.b-head { fill: var(--ink); }
+.b-hair { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.b-eye { fill: #fff; }
+.b-drop { fill: var(--car-3); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+.b-q { font-family: var(--en); font-size: 30px; fill: var(--ink); }
+.b-q.sm { font-size: 20px; }
+.b-sq { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+.b-star { fill: var(--blk-2); stroke: var(--ink); stroke-width: 1.1; stroke-linejoin: round; }
+.b-w { transform-box: fill-box; transform-origin: center; }
+.lost.shake .b-w { animation: b-shake var(--d, .45s) ease-in-out var(--dl, 0s) infinite alternate; }
+@keyframes b-shake { from { transform: translate(-1.5px, 1px) rotate(-6deg); } to { transform: translate(1.5px, -1px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .lost.shake .b-w { animation: none; } }
+
 /* 지도 위 안내 화살표의 짧은 말 */
 .m-say-bg { fill: #fff; stroke-width: 2.5; }
 .m-say-t { font-family: var(--ko); font-weight: 800; font-size: 13px; fill: var(--ink); }

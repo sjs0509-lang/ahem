@@ -243,10 +243,10 @@
 
     // 자전거 그림 (주인공과 앞서 가는 사람이 같이 씀)
     const bikeGlyph = (parent) => {
-      const flip = el("g", {}, parent);
-      [-12, 12].forEach((x) => el("circle", { cx: x, cy: 0, r: 9, fill: "#fff", stroke: "var(--ink)", "stroke-width": 2.4 }, flip));
-      el("path", { d: "M-12 0 L-3 -12 L9 -12 L12 0 M-3 -12 L0 0 L-12 0 M9 -12 L7 -17 L12 -17 M-3 -12 L-5 -16 M-4 -16 L2 -27", fill: "none", stroke: "var(--ink)", "stroke-width": 2.2, "stroke-linejoin": "round", "stroke-linecap": "round" }, flip);
-      el("circle", { cx: 3, cy: -32, r: 5, fill: "var(--ink)" }, flip);
+      const flip = el("g", {}, parent), j = el("g", { class: "m-jolt" }, flip); // j = 급정거 때 앞으로 쏠림
+      [-12, 12].forEach((x) => el("circle", { cx: x, cy: 0, r: 9, fill: "#fff", stroke: "var(--ink)", "stroke-width": 2.4 }, j));
+      el("path", { d: "M-12 0 L-3 -12 L9 -12 L12 0 M-3 -12 L0 0 L-12 0 M9 -12 L7 -17 L12 -17 M-3 -12 L-5 -16 M-4 -16 L2 -27", fill: "none", stroke: "var(--ink)", "stroke-width": 2.2, "stroke-linejoin": "round", "stroke-linecap": "round" }, j);
+      el("circle", { cx: 3, cy: -32, r: 5, fill: "var(--ink)" }, j);
       return flip;
     };
     const faceAt = (flip, s) => flip.setAttribute("transform", `translate(0 -10)${T(s)[0] < -0.05 ? " scale(-1 1)" : ""}`);
@@ -268,6 +268,26 @@
         k = b[2] / (svg.clientWidth || 600);
         fixed.forEach(place);
         hooks.box.forEach((fn) => fn(k));
+      },
+      bikeEl: () => bikeF.g,
+      // 끼익 정지: 자전거 뒤 빗금 속도선 + 앞 타이어의 터지는 별. 자전거는 앞으로 쏠렸다 돌아옴
+      screech() {
+        const f = pin(bikeF.p, "m-screech"), g = el("g", { transform: "scale(1.5) " + (flip.getAttribute("transform") || "") }, f.g);
+        const lines = el("g", { class: "m-speed" }, g);
+        [[-25, -15], [-27, -9], [-25, -3], [-29, 3]].forEach(([x, y], i) => el("line", { x1: x, y1: y, x2: x - 14 - (i % 2) * 6, y2: y + 5 }, lines));
+        el("path", { d: "M-16 9.5 h-12 M-19 12 h-8", class: "m-skid" }, g);
+        const b = el("g", { transform: "translate(21 6)" }, g);
+        let d = "";
+        for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, rr = i % 2 ? 3.4 : 8.5; d += (i ? "L" : "M") + f1(Math.cos(a) * rr) + " " + f1(Math.sin(a) * rr); }
+        const burst = el("path", { d: d + "Z", class: "m-burst" }, b);
+        place(f);
+        const j = $(".m-jolt", bikeF.g);
+        if (!RM.matches && j.animate) {
+          j.animate([{ transform: "none" }, { transform: "translate(3px,0) rotate(7deg)", offset: 0.25 }, { transform: "translate(-1px,0) rotate(-2deg)", offset: 0.6 }, { transform: "none" }], { duration: 520, easing: "ease-out" });
+          burst.animate([{ transform: "scale(.2)", opacity: 0 }, { transform: "scale(1.25)", opacity: 1, offset: 0.3 }, { transform: "scale(1)", opacity: 1 }], { duration: 420, easing: "ease-out", fill: "forwards" });
+          lines.animate([{ transform: "translate(8px,0)", opacity: 0 }, { transform: "none", opacity: 1, offset: 0.4 }, { transform: "none", opacity: 1 }], { duration: 400, fill: "forwards" });
+        }
+        return { remove() { f.g.remove(); fixed.splice(fixed.indexOf(f), 1); } };
       },
       setBike(s) {
         bikeF.p = P(s);
@@ -351,6 +371,112 @@
       }
     };
     return map;
+  }
+
+  /* =========================================================
+     크게 그린 사람들 (지도 위 작은 그림과 같은 그림체: 얇은 검정 외곽선 + 단색 면)
+     좌표: (0, 0) = 발 밑 땅, 위로 갈수록 -y
+     ========================================================= */
+  const spokesD = (cx, cy, r, n = 8) => { let d = ""; for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI; d += `M${f1(cx + Math.cos(a) * r)} ${f1(cy + Math.sin(a) * r)} L${f1(cx - Math.cos(a) * r)} ${f1(cy - Math.sin(a) * r)} `; } return d; };
+  // 자전거 탄 사람. me = 나(검은 사람, 얼굴 있음), 아니면 앞서 가는 아저씨(노랑 옷)
+  function riderBig(x, y, o = {}) {
+    const wheel = (cx) => `<circle class="b-tire" cx="${cx}" cy="-24" r="24"/><path class="b-spoke" d="${spokesD(cx, -24, 20)}"/><circle class="b-hub" cx="${cx}" cy="-24" r="3"/>`;
+    return `<g transform="translate(${x} ${y})${o.flip ? " scale(-1 1)" : ""}">
+      ${wheel(-34)}${wheel(34)}
+      <path class="b-frame" d="M-34 -24 L-10 -54 L22 -54 L34 -24 M-10 -54 L-2 -24 L-34 -24 M22 -54 L18 -68 L30 -68 M-10 -54 L-13 -64 M-21 -64 L-6 -64"/>
+      <path class="b-limb" d="M-12 -66 L6 -40 L-2 -24"/>
+      <path class="b-torso${o.me ? "" : " helper"}" d="M-16 -64 L-2 -100 L10 -98 L4 -66 Z"/>
+      <path class="b-limb" d="M2 -94 L20 -76 L28 -68"/>
+      <circle class="b-head" cx="4" cy="-114" r="13"/>
+      ${o.me ? `<circle class="b-eye" cx="8" cy="-116" r="2"/><circle class="b-eye" cx="14" cy="-116" r="2"/><circle class="b-eye" cx="12" cy="-107" r="2.3"/>` : ""}
+    </g>`;
+  }
+  // 서 있는 사람 (노랑 = 사람의 안내). point = 팔을 뻗어 가리키는 방향(1 오른쪽 / -1 왼쪽), dress = 치마 모양
+  function standBig(x, y, o = {}) {
+    const s = o.point || 0, h = o.h || 1;
+    const arm = s ? `<path class="b-limb" d="M0 ${-92 * h} L${s * 30} ${-104 * h} L${s * 46} ${-112 * h}"/><path class="b-limb" d="M0 ${-92 * h} L${-s * 12} ${-62 * h}"/>`
+      : `<path class="b-limb" d="M-6 ${-90 * h} L-16 ${-60 * h} M6 ${-90 * h} L16 ${-60 * h}"/>`;
+    const body = o.dress ? `<path class="b-torso helper" d="M-6 ${-100 * h} L6 ${-100 * h} L22 ${-40 * h} L-22 ${-40 * h} Z"/>` : `<path class="b-torso helper" d="M-12 ${-100 * h} L12 ${-100 * h} L14 ${-48 * h} L-14 ${-48 * h} Z"/>`;
+    return `<g transform="translate(${x} ${y})">
+      <path class="b-limb" d="M-7 ${-44 * h} L-9 0 M7 ${-44 * h} L9 0"/>
+      ${arm}${body}
+      <circle class="b-head" cx="0" cy="${-116 * h}" r="${12 * Math.min(1, h + 0.1)}"/>
+      ${o.hair ? `<path class="b-hair" d="M-12 ${-118 * h} Q-14 ${-96 * h} -4 ${-92 * h} M12 ${-118 * h} Q14 ${-96 * h} 4 ${-92 * h}"/>` : ""}
+    </g>`;
+  }
+  // 당황 표시: 파란 땀방울, 물음표, 구불구불한 짧은 선, 작은 별표 (각자 다른 박자로 살짝 흔들림)
+  const drop = (x, y, s) => `<path class="b-drop" transform="translate(${x} ${y}) scale(${s})" d="M0 -9 C3 -4 7 0 7 4 A7 7 0 0 1 -7 4 C-7 0 -3 -4 0 -9 Z"/>`;
+  const PANIC = `<g class="b-panic">
+      <g class="b-w" style="--d:.42s">${drop(28, -122, 1)}</g><g class="b-w" style="--d:.5s;--dl:-.2s">${drop(-20, -104, 0.75)}</g>
+      <g class="b-w" style="--d:.36s;--dl:-.1s"><text class="b-q" x="30" y="-138" transform="rotate(12 30 -138)">?</text></g>
+      <g class="b-w" style="--d:.46s;--dl:-.3s"><text class="b-q sm" x="-36" y="-140" transform="rotate(-16 -36 -140)">?</text></g>
+      <g class="b-w" style="--d:.4s;--dl:-.15s"><path class="b-sq" d="M-44 -118 q3 -5 6 0 t6 0 t6 0"/><path class="b-sq" d="M38 -100 q3 -5 6 0 t6 0"/></g>
+      <g class="b-w" style="--d:.55s;--dl:-.25s"><path class="b-star" d="${star(48, -126, 6)}"/><path class="b-star" d="${star(-10, -152, 5)}"/></g>
+    </g>`;
+
+  /* =========================================================
+     길을 잃었다 — 지점에 도착하면 늘 같은 연출
+     ① 끼익 정지: 지도 위 자전거가 급하게 멈춤 (빗금 속도선 + 터지는 별)
+     ② 당황한 나: 지도 위 검은 사람이 화면 가운데로 크게 확대, 머리 주변 표시가 살짝 흔들림
+     ③ 잠깐 머문 뒤 작아지며 사라지고 지도로 돌아감
+     lostFx(sec, { map, screech }) → { done: Promise, stop() }
+       screech: false 면 ①은 건너뛰고 당황만 (NODE 02 중간처럼 다시 쓸 때)
+     눌러서 건너뛸 수 있음. prefers-reduced-motion이면 확대·흔들림 없이 짧게 페이드만
+     ========================================================= */
+  function lostFx(sec, o = {}) {
+    let box = $(".lost", sec);
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "lost";
+      box.setAttribute("aria-hidden", "true");
+      box.innerHTML = `<svg viewBox="-110 -180 220 210"><circle class="b-bg" cx="0" cy="-76" r="98"/><line class="b-ground" x1="-74" y1="0" x2="74" y2="0"/>${riderBig(0, 0, { me: true })}${PANIC}</svg>`;
+      sec.appendChild(box);
+    }
+    const rm = RM.matches, timers = [], anims = [];
+    let fin, stopped = false, mark = null;
+    const done = new Promise((res) => { fin = res; });
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const end = () => {
+      if (stopped) return;
+      stopped = true;
+      timers.forEach(clearTimeout); anims.forEach((a) => a.cancel());
+      box.classList.remove("on", "shake");
+      box.style.opacity = ""; box.style.transform = "";
+      if (mark) mark.remove();
+      box.removeEventListener("click", skip);
+      fin();
+    };
+    // 눌러서 건너뛰기: 바로 작아지며 사라짐
+    const skip = () => { if (!stopped) { timers.forEach(clearTimeout); out(); } };
+    box.addEventListener("click", skip);
+
+    // 시작점 = 지도 위 자전거 자리 (섹션 기준, 가운데에서 얼마나 떨어졌나)
+    const from = () => {
+      const b = sec.getBoundingClientRect(), r = o.map ? o.map.bikeEl().getBoundingClientRect() : null;
+      if (!r || !r.width) return [0, 0];
+      return [r.left + r.width / 2 - (b.left + b.width / 2), r.top + r.height / 2 - (b.top + b.height / 2)];
+    };
+    const small = () => { const f = from(); return `translate(${f1(f[0])}px, ${f1(f[1])}px) scale(.1)`; };
+    function zoomIn() {
+      box.classList.add("on");
+      if (rm || !box.animate) { anims.push(box.animate ? box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: "forwards" }) : { cancel() {} }); later(out, 1100); return; }
+      anims.push(box.animate([{ transform: small(), opacity: 0.4 }, { transform: "scale(1.06)", opacity: 1, offset: 0.75 }, { transform: "none", opacity: 1 }], { duration: 480, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" }));
+      later(() => box.classList.add("shake"), 380);
+      later(out, 480 + 1500); // 1.5초 머묾
+    }
+    function out() {
+      box.classList.remove("shake");
+      const a = rm || !box.animate ? (box.animate ? box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: "forwards" }) : null)
+        : box.animate([{ transform: "none", opacity: 1 }, { transform: small(), opacity: 0 }], { duration: 380, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" });
+      if (!a) { end(); return; }
+      anims.push(a);
+      a.onfinish = end;
+    }
+    if (o.screech !== false && o.map) {
+      mark = o.map.screech();
+      later(zoomIn, rm ? 350 : 650);
+    } else zoomIn();
+    return { done, stop: end };
   }
 
   /* =========================================================
@@ -1027,17 +1153,23 @@
     frameSets.push(photoFrames(map));
     const g = p.guide || {};
     const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label }) : null;
-    const DUR = guide ? 3000 : 2000;
-    return {
-      sec, DUR,
+    const ARRIVE = 1800, DUR = guide ? 3000 : 2000;
+    // 달려오다 급하게 멈춤: 처음엔 가속, 끝까지 속도를 줄이지 않음
+    const rush = (x) => { const a = 0.4; x = clamp(x); return (x < a ? (x * x) / (2 * a) : x - a / 2) / (1 - a / 2); };
+    const sc = {
+      sec, ARRIVE, DUR, map, fx: null,
       apply(t) {
         const full = map.fit(VIEW), z = sceneBox(map, p, sp);
         const ez = ease(clamp((t - 500) / 1300));
         map.setBox(full.map((v, k) => lerp(v, z[k], ez)));
-        map.setBike(lerp(from, to, ease(clamp(t / 1800))));
+        map.setBike(lerp(from, to, rush(t / ARRIVE)));
         if (guide) guide.set(clamp((t - 2000) / 800));
-      }
+      },
+      // 도착한 뒤, 안내가 나오기 전: 길을 잃었다
+      run(fx) { sc.fx = fx; return fx.done; },
+      mid() { return sc.run(lostFx(sec, { map })); }
     };
+    return sc;
   }
 
   /* =========================================================
@@ -1451,19 +1583,31 @@
   /* =========================================================
      지도 장면 재생: 화면에 들어오면 처음부터, 나가면 처음 상태로
      ========================================================= */
-  function sceneReset(sc) { cancelAnimationFrame(sc.raf); sc.played = false; sc.apply(0); }
-  function sceneEnd(sc) { sc.apply(sc.DUR); }
+  // 도착(0 → ARRIVE) → 길을 잃었다 연출(mid) → 그때의 안내(ARRIVE → DUR)
+  function sceneReset(sc) {
+    sc.token = null;
+    cancelAnimationFrame(sc.raf);
+    if (sc.fx) { sc.fx.stop(); sc.fx = null; }
+    sc.played = false; sc.t = 0; sc.apply(0);
+  }
+  function sceneEnd(sc) { sc.t = sc.DUR; sc.apply(sc.DUR); }
   function scenePlay(sc) {
     if (sc.played) return;
     sc.played = true;
-    if (RM.matches) { sceneEnd(sc); return; }
-    const t0 = performance.now();
-    const step = (now) => {
-      const t = Math.min(sc.DUR, now - t0);
-      sc.apply(t);
-      if (t < sc.DUR) sc.raf = requestAnimationFrame(step);
-    };
-    sc.raf = requestAnimationFrame(step);
+    const token = sc.token = {}, live = () => sc.token === token;
+    const tween = (a, b) => new Promise((res) => {
+      if (RM.matches) { sc.t = b; sc.apply(b); res(); return; }
+      const t0 = performance.now();
+      const step = (now) => {
+        if (!live()) return;
+        sc.t = Math.min(b, a + now - t0); sc.apply(sc.t);
+        if (sc.t < b) sc.raf = requestAnimationFrame(step); else res();
+      };
+      sc.raf = requestAnimationFrame(step);
+    });
+    tween(0, sc.ARRIVE)
+      .then(() => live() && sc.mid())
+      .then(() => { sc.fx = null; if (live()) return tween(sc.ARRIVE, sc.DUR); });
   }
 
   function layoutAll() {
@@ -1471,7 +1615,7 @@
     introMap.setBike(0);
     obViews.forEach((v) => v.layout());
     frameSets.forEach((f) => f.layout());
-    scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
+    scenes.forEach((sc) => (sc.played ? sc.apply(sc.t || 0) : sceneReset(sc)));
     felts.forEach((f) => f.render());
     resolves.forEach((r) => r.layout());
     drawCompare();
