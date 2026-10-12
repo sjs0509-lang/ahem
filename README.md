@@ -29,6 +29,7 @@
 - `at` 지도 위 위치 (경로 한 바퀴를 0~1로 본 값), `scene` 지도에 더 그릴 공간 (fork / forest / road)
 - `TEXT.title` 표지의 큰 제목 (`<title>`·링크 미리보기는 `index.html`)
 - `TEXT` 도입 문장, 읽는 법, 엔딩의 큰 글자(`mission`), 사진 시간 막대(`timeline`), 맞추다 화면(`meaning`), 마지막 문장(`thesis`)과 그 아래 작은 글씨(`thesisAfter`)
+- `TEXT.sound` 오른쪽 위 배경음 버튼 글자 (파도·갈매기·작은 새 소리는 브라우저에서 바로 만듦, 처음엔 꺼짐)
 - `TEXT.hints` 처음 보는 사람용 동작 안내 문구 [마우스, 휴대폰]
 - `TEXT.onboard` 표지 다음 펜툴 온보딩 3화면 문구 (`lines`, `sub`, 세 번째 화면의 `tools`)
 - `PHOTOS` 첫 지도 위 사진 프레임: `time`(시각), `place`(장소), `file`(파일 이름), `at`(찍은 곳), `size`(large / small), `kind`(photo / phone / none), `hidden`(화면에서만 숨김). 누르면 크게 열리고, 위로 밀면 시각·장소·작은 지도가 나옵니다.

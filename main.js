@@ -1849,4 +1849,148 @@
     scenes.forEach(sceneEnd);
     document.querySelectorAll("#legend, .who, .mission, .meaning, .thesis").forEach((e) => e.classList.add("in"));
   }
+
+  /* =========================================================
+     배경음: 바닷가 공원 (파일 없이 브라우저에서 바로 만듦)
+     파도 = 걸러낸 잡음이 5~9초마다 밀려왔다 빠짐 + 낮은 바다 울림
+     새 = 가끔 갈매기, 공원의 작은 새 지저귐
+     브라우저는 누르기 전에는 소리를 못 내서, 오른쪽 위 "바다 소리" 버튼으로 켬 (처음엔 꺼짐)
+     켜 둔 상태는 기억해서, 다음에 오면 화면을 처음 누를 때 다시 켜짐
+     ========================================================= */
+  (function ambience() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const SD = TEXT.sound || { on: "소리 끄기", off: "바다 소리 켜기", label: "바다 소리" };
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "snd";
+    btn.innerHTML = `<svg viewBox="0 0 28 16" aria-hidden="true"><path class="snd-w" d="M2 9 q3 -5 6 0 t6 0 t6 0 t6 0"/><path class="snd-x" d="M4 2 L24 14"/></svg><span>${esc(SD.label)}</span>`;
+    document.body.appendChild(btn);
+
+    let ctx = null, master = null, on = false, timers = [];
+    const swells = []; // 파도 층마다 "밀려오기" 예약 함수
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const store = (v) => { try { localStorage.setItem("sound", v ? "on" : "off"); } catch (e) { /* 저장이 안 돼도 소리는 됨 */ } };
+    const saved = () => { try { return localStorage.getItem("sound") === "on"; } catch (e) { return false; } };
+
+    function noiseBuffer(kind) {
+      const len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        if (kind === "brown") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+      }
+      return buf;
+    }
+    function loop(buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.start(); return s; }
+
+    // 파도 한 겹: 밀려올 때 커지고 밝아졌다가 천천히 빠짐
+    function waveLayer(buf, pan) {
+      const f = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      f.type = "lowpass"; f.frequency.value = 450; f.Q.value = 0.4;
+      g.gain.value = 0.03;
+      loop(buf).connect(f); f.connect(g);
+      if (p) { p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+      const swell = () => {
+        if (!on) return;
+        const t = ctx.currentTime, rise = rand(1.8, 3), peak = rand(0.16, 0.3);
+        g.gain.setTargetAtTime(peak, t, rise / 3);
+        f.frequency.setTargetAtTime(rand(1100, 1700), t, rise / 3);
+        g.gain.setTargetAtTime(0.03, t + rise, rand(1.2, 2));
+        f.frequency.setTargetAtTime(420, t + rise, 1.6);
+        later(swell, rand(5000, 9000));
+      };
+      swells.push(swell);
+    }
+    // 갈매기: "끼-요" 두세 번
+    function gull() {
+      if (!on) return;
+      const t0 = ctx.currentTime + 0.05, n = 2 + Math.floor(Math.random() * 2), pan = rand(-0.8, 0.8);
+      for (let k = 0; k < n; k++) {
+        const t = t0 + k * rand(0.32, 0.42), o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = "triangle";
+        o.frequency.setValueAtTime(rand(1500, 1700), t);
+        o.frequency.exponentialRampToValueAtTime(rand(900, 1050), t + 0.26);
+        bp.type = "bandpass"; bp.frequency.value = 1300; bp.Q.value = 1.6;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.045, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0005, t + 0.3);
+        o.connect(bp); bp.connect(g);
+        if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+        o.start(t); o.stop(t + 0.32);
+      }
+      later(gull, rand(11000, 24000));
+    }
+    // 공원의 작은 새: 짧은 지저귐
+    function chirp() {
+      if (!on) return;
+      const t0 = ctx.currentTime + 0.05, n = 2 + Math.floor(Math.random() * 3);
+      for (let k = 0; k < n; k++) {
+        const t = t0 + k * 0.11, o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime(rand(3200, 3800), t);
+        o.frequency.exponentialRampToValueAtTime(rand(4400, 5200), t + 0.07);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.018, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0003, t + 0.09);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + 0.1);
+      }
+      later(chirp, rand(6000, 15000));
+    }
+
+    function build() {
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(ctx.destination);
+      const white = noiseBuffer("white"), brown = noiseBuffer("brown");
+      // 낮은 바다 울림 (늘 깔림)
+      const lf = ctx.createBiquadFilter(), lg = ctx.createGain();
+      lf.type = "lowpass"; lf.frequency.value = 180; lg.gain.value = 0.22;
+      loop(brown).connect(lf); lf.connect(lg); lg.connect(master);
+      waveLayer(white, -0.35);
+      waveLayer(white, 0.35);
+    }
+    function start() {
+      if (!ctx) build();
+      if (ctx.state === "suspended") ctx.resume();
+      on = true;
+      timers.forEach(clearTimeout); timers = [];
+      swells.forEach((fn, i) => later(fn, 200 + i * 3400)); // 두 층이 엇갈려 밀려옴
+      later(gull, rand(3000, 7000));
+      later(chirp, rand(1500, 4000));
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setTargetAtTime(0.55, ctx.currentTime, 0.6); // 천천히 커짐
+      render();
+    }
+    function stop() {
+      on = false;
+      timers.forEach(clearTimeout); timers = [];
+      if (ctx) {
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
+        setTimeout(() => { if (!on && ctx.state === "running") ctx.suspend(); }, 1200);
+      }
+      render();
+    }
+    function render() {
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.setAttribute("aria-label", on ? SD.on : SD.off);
+    }
+    btn.addEventListener("click", () => { if (on) stop(); else start(); store(on); });
+    // 켜 두었던 사람은 화면을 처음 누를 때 다시 켜짐
+    if (saved()) {
+      const first = (e) => { if (e.target.closest(".snd")) return; window.removeEventListener("pointerdown", first, true); if (!on) start(); };
+      window.addEventListener("pointerdown", first, true);
+    }
+    // 다른 탭으로 가면 잠시 멈춤
+    document.addEventListener("visibilitychange", () => {
+      if (!ctx || !on) return;
+      if (document.hidden) ctx.suspend(); else ctx.resume();
+    });
+    render();
+  })();
 })();
