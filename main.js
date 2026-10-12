@@ -1876,7 +1876,10 @@
     const rand = (a, b) => a + Math.random() * (b - a);
     const later = (fn, ms) => timers.push(setTimeout(fn, ms));
     const store = (v) => { try { localStorage.setItem("sound", v ? "on" : "off"); } catch (e) { /* 저장이 안 돼도 소리는 됨 */ } };
-    const saved = () => { try { return localStorage.getItem("sound") === "on"; } catch (e) { return false; } };
+    const savedAs = () => { try { return localStorage.getItem("sound"); } catch (e) { return null; } };
+    const saved = () => savedAs() === "on";
+    // 버튼으로 직접 끈 사람만 벨까지 조용히
+    let muted = savedAs() === "off", fx = null, built = false;
 
     function noiseBuffer(kind) {
       const len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
@@ -1944,11 +1947,21 @@
       later(chirp, rand(6000, 15000));
     }
 
-    function build() {
+    // 소리 길: 배경음(master)과 효과음(fx)을 따로 → 배경음을 꺼 둬도 벨은 울림
+    function ensureCtx() {
+      if (ctx) return;
       ctx = new AC();
       master = ctx.createGain();
       master.gain.value = 0;
       master.connect(ctx.destination);
+      fx = ctx.createGain();
+      fx.gain.value = 1;
+      fx.connect(ctx.destination);
+    }
+    function build() {
+      ensureCtx();
+      if (built) return;
+      built = true;
       const white = noiseBuffer("white"), brown = noiseBuffer("brown");
       // 낮은 바다 울림 (늘 깔림)
       const lf = ctx.createBiquadFilter(), lg = ctx.createGain();
@@ -1958,9 +1971,9 @@
       waveLayer(white, 0.35);
     }
     function start() {
-      if (!ctx) build();
+      build();
       if (ctx.state === "suspended") ctx.resume();
-      on = true;
+      on = true; muted = false;
       timers.forEach(clearTimeout); timers = [];
       swells.forEach((fn, i) => later(fn, 200 + i * 3400)); // 두 층이 엇갈려 밀려옴
       later(gull, rand(3000, 7000));
@@ -1970,7 +1983,7 @@
       render();
     }
     function stop() {
-      on = false;
+      on = false; muted = true;
       timers.forEach(clearTimeout); timers = [];
       if (ctx) {
         master.gain.cancelScheduledValues(ctx.currentTime);
@@ -1985,24 +1998,40 @@
       btn.setAttribute("aria-label", on ? SD.on : SD.off);
     }
     // 자전거 벨 "따릉따릉": 쇳소리 배음(어긋난 배수)을 빠르게 두 번씩, 두 묶음
+    //   배경음과 상관없이 울림 (버튼으로 직접 끈 경우만 조용). 브라우저가 소리를 허락한 뒤(화면을 한 번 누른 뒤)부터 들림
     SOUND.bell = () => {
-      if (!on || !ctx) return;
-      const t0 = ctx.currentTime + 0.03, out = ctx.createGain();
-      out.gain.value = 0.5;
-      out.connect(master);
-      [0, 0.075, 0.36, 0.435].forEach((dt, k) => {
-        const t = t0 + dt, hit = k % 2 ? 0.75 : 1;
-        [[2350, 1, 0.9], [2357, 0.6, 0.9], [6480, 0.35, 0.45], [12700, 0.12, 0.25]].forEach(([f, a, d]) => {
-          const o = ctx.createOscillator(), g = ctx.createGain();
-          o.type = "sine"; o.frequency.value = f;
-          g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.09 * a * hit, t + 0.004);
-          g.gain.exponentialRampToValueAtTime(0.0002, t + d);
-          o.connect(g); g.connect(out);
-          o.start(t); o.stop(t + d + 0.05);
+      if (muted || document.hidden) return;
+      ensureCtx();
+      const ring = () => {
+        const t0 = ctx.currentTime + 0.03;
+        // 벨이 울리는 동안 파도를 살짝 줄임
+        if (on) { master.gain.cancelScheduledValues(t0); master.gain.setTargetAtTime(0.25, t0, 0.05); master.gain.setTargetAtTime(0.55, t0 + 1, 0.4); }
+        [0, 0.08, 0.38, 0.46].forEach((dt, k) => {
+          const t = t0 + dt, hit = k % 2 ? 0.8 : 1;
+          [[1870, 1, 1.1], [1877, 0.7, 1.1], [5150, 0.45, 0.55], [9900, 0.18, 0.3]].forEach(([f, a, d]) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = "sine"; o.frequency.value = f;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.16 * a * hit, t + 0.003);
+            g.gain.exponentialRampToValueAtTime(0.0002, t + d);
+            o.connect(g); g.connect(fx);
+            o.start(t); o.stop(t + d + 0.05);
+          });
         });
-      });
+      };
+      if (ctx.state === "running") ring();
+      else ctx.resume().then(() => { if (ctx.state === "running") ring(); }).catch(() => {});
     };
+    // 화면을 처음 누르거나 키를 누를 때 소리를 허락받아 둠 (그래야 나중에 벨이 바로 울림)
+    const unlock = () => {
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+      if (muted) return;
+      ensureCtx();
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    };
+    window.addEventListener("pointerdown", unlock, true);
+    window.addEventListener("keydown", unlock, true);
     btn.addEventListener("click", () => { if (on) stop(); else start(); store(on); });
     // 켜 두었던 사람은 화면을 처음 누를 때 다시 켜짐
     if (saved()) {
