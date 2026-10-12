@@ -386,7 +386,26 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .cmp-grid .td .r { color: var(--red); }
 .cmp-grid .mini { width: clamp(30px, 3.4vw, 46px); height: auto; flex: none; }
 
-/* ---------- 3-② 깨달음 ---------- */
+/* ---------- 3-① MISSION CLEAR (게임 연출은 여기에만) ---------- */
+.mission { display: flex; align-items: center; justify-content: center; }
+.mc-title { position: relative; z-index: 2; margin: 0; text-align: center; font-size: clamp(56px, 14vw, 184px); line-height: .92; letter-spacing: .01em; color: var(--ink); text-shadow: .045em .045em 0 var(--sea); }
+.mc-title span { display: block; }
+.mc-deco { position: absolute; z-index: 1; left: var(--x); top: var(--y); width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); opacity: 0; transform: scale(0) rotate(var(--r)); }
+.mc-deco i { display: block; width: 100%; height: 100%; }
+.mc-deco svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.mission.in .mc-title { animation: mc-pop .6s cubic-bezier(.3, 1.5, .5, 1) both; }
+.mission.in .mc-deco { animation: mc-pop .5s cubic-bezier(.3, 1.7, .5, 1) var(--dl) forwards; }
+.mission.in .mc-deco i { animation: mc-bob var(--bd) ease-in-out calc(var(--dl) + .5s) infinite alternate; }
+@keyframes mc-pop { from { opacity: 0; transform: scale(0) rotate(var(--r, 0deg)); } to { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
+@keyframes mc-bob { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+@media (max-width: 640px) { .mc-deco { top: calc(50% + (var(--y) - 50%) * .5); width: calc(var(--s) * .62); height: calc(var(--s) * .62); margin: calc(var(--s) * -.31) 0 0 calc(var(--s) * -.31); } }
+@media (prefers-reduced-motion: reduce) {
+  .mission.in .mc-title, .mission.in .mc-deco, .mission.in .mc-deco i { animation: none; }
+  .mc-deco { opacity: 1; transform: rotate(var(--r)); }
+}
+
+/* ---------- 3-② 사진 시간 막대 ---------- */
+.photos { display: flex; align-items: center; max-width: 1100px; margin: 0 auto; }
 .tl { position: relative; width: 100%; padding: 0 28px 34px; }
 .tl-title { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 40px; margin-left: -28px; }
 .tl-bar { position: relative; height: 12px; }
@@ -401,10 +420,8 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .tl-after { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
 .cmp-grid .td-all { grid-column: 2 / -1; color: var(--ink); }
 
-.thesis { display: flex; flex-direction: column; justify-content: center; gap: clamp(40px, 8vh, 80px); max-width: 1100px; margin: 0 auto; }
-.def { display: grid; gap: 4px; padding-left: 14px; border-left: 4px solid var(--ink); }
-.def b { font-size: clamp(18px, 2vw, 24px); font-weight: 800; }
-.def span { font-size: clamp(15px, 1.6vw, 19px); color: var(--ink-2); }
+/* ---------- 3-④ 깨달음 ---------- */
+.thesis { display: flex; flex-direction: column; justify-content: center; max-width: 1100px; margin: 0 auto; }
 .big { font-weight: 800; font-size: clamp(24px, 4.2vw, 56px); line-height: 1.32; letter-spacing: -0.035em; }
 .big span { display: block; }
 .big span:last-child { margin-top: 0.5em; }

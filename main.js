@@ -1603,7 +1603,7 @@
     resolves.push(resolveScene($(`#p${p.id}-out`, wrap), p));
   });
 
-  // 3-① 비교: 같은 기준선, 같은 축척 + 아래 표
+  // 3-③ 비교: 같은 기준선, 같은 축척 + 아래 표
   const maxR = Math.max(...POINTS.map(ratioOf));
   const estIds = POINTS.filter((p) => isEst(p.actual) || isEst(p.felt)).map((p) => p.id);
   const TB = TEXT.table;
@@ -1637,8 +1637,23 @@
     svg.innerHTML = out;
   }
 
-  // 3-② 깨달음
-  // 사진 시간 막대: 사진마다 점, 길을 잃은 뒤는 비어 있음
+  // 3-① 엔딩: MISSION CLEAR. 지도에 쓴 요소들이 주변에서 하나씩 튀어나오며 꾸민다 (게임 연출은 여기에만)
+  const DECO = {
+    tree: (i) => `<svg viewBox="-30 -30 60 60"><path d="${scallop(0, 0, 25, 9, i * 0.5)}" fill="${TREE_FILLS[i % 3]}" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
+    wave: () => `<svg viewBox="-30 -16 60 32"><path d="M-27 -4 q6.75 -8 13.5 0 t13.5 0 t13.5 0 t13.5 0 M-20 8 q6.75 -8 13.5 0 t13.5 0 t13.5 0" fill="none" stroke="var(--sea-ink)" stroke-width="2.6" stroke-linecap="round"/></svg>`,
+    bike: () => `<svg viewBox="-26 -42 52 54"><circle cx="-12" cy="0" r="9" fill="#fff" stroke="var(--ink)" stroke-width="2.4"/><circle cx="12" cy="0" r="9" fill="#fff" stroke="var(--ink)" stroke-width="2.4"/><path d="M-12 0 L-3 -12 L9 -12 L12 0 M-3 -12 L0 0 L-12 0 M9 -12 L7 -17 L12 -17 M-3 -12 L-5 -16 M-4 -16 L2 -27" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="3" cy="-32" r="5" fill="var(--ink)"/></svg>`,
+    shop: () => `<svg viewBox="-28 -33 56 48"><rect x="-20" y="-14" width="40" height="26" fill="var(--blk-2)" stroke="var(--ink)" stroke-width="1.3"/><path d="M-25 -13 L0 -30 L25 -13 Z" fill="var(--car-1)" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/><rect x="-6" y="-2" width="12" height="14" fill="#fff" stroke="var(--ink)" stroke-width="1.3"/><circle cx="-13" cy="4" r="4.5" fill="#fff" stroke="var(--ink)" stroke-width="1.3"/><circle cx="13" cy="4" r="4.5" fill="#fff" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
+    sparkle: () => `<svg viewBox="-24 -24 48 48"><path d="${star(0, 0, 21)}" fill="var(--blk-2)" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+    asterisk: () => `<svg viewBox="-20 -20 40 40"><path d="M0 -15 V15 M-13 -7.5 L13 7.5 M-13 7.5 L13 -7.5" stroke="var(--ink)" stroke-width="3.6" stroke-linecap="round"/></svg>`
+  };
+  // [종류, 가로 %, 세로 %, 크기 px, 기울기]
+  const DECO_AT = [["tree", 10, 22, 76, 0], ["sparkle", 25, 12, 40, 10], ["bike", 44, 14, 82, -6], ["asterisk", 63, 10, 30, 0], ["shop", 82, 18, 84, 4],
+    ["wave", 91, 44, 70, 0], ["tree", 88, 72, 64, 0], ["sparkle", 72, 86, 34, -8], ["wave", 50, 88, 80, 0], ["asterisk", 30, 84, 28, 20],
+    ["tree", 12, 76, 58, 0], ["wave", 8, 48, 62, 0]];
+  $("#mission").innerHTML = `<h2 class="mc-title en">${(TEXT.mission || []).map((t) => `<span>${esc(t)}</span>`).join("")}</h2>
+    ${DECO_AT.map(([k, x, y, s, r], i) => `<span class="mc-deco" style="--x:${x}%;--y:${y}%;--s:${s}px;--r:${r}deg;--dl:${(0.45 + i * 0.12).toFixed(2)}s;--bd:${(2.6 + (i % 4) * 0.5).toFixed(1)}s" aria-hidden="true"><i>${DECO[k](i)}</i></span>`).join("")}`;
+
+  // 3-② 사진 시간 막대: 사진마다 점, 길을 잃은 뒤는 비어 있음
   const TL = TEXT.timeline;
   const mins = (t) => { const m = /(\d+):(\d+)\s*(AM|PM)?/i.exec(t || ""); if (!m) return null; let h = +m[1] % 12; if (/pm/i.test(m[3] || "")) h += 12; return h * 60 + +m[2]; };
   const t0 = mins(TL.start), t1 = mins(TL.end), tl = mins(TL.lost);
@@ -1654,8 +1669,9 @@
       <div class="tl-axis"><span style="left:0">${esc(TL.start)}</span><span style="left:${pct(tl)}">${esc(TL.lost)}</span><span style="left:100%">${esc(TL.end)}</span></div>
       <p class="tl-after" style="left:${pct((tl + t1) / 2)}">${esc(TL.after)}</p>
     </div>`;
-  $("#thesis").innerHTML = timeline + `<p class="def"><b>${esc(TEXT.definition[0])}</b><span>${esc(TEXT.definition[1])}</span></p>
-    <p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
+  $("#photos").innerHTML = timeline;
+  // 3-④ 깨달음: 마지막 문장
+  $("#thesis").innerHTML = `<p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
 
   /* =========================================================
      지도 장면 재생: 화면에 들어오면 처음부터, 나가면 처음 상태로
@@ -1771,7 +1787,7 @@
       if (ov) { ov.play(en.isIntersecting); return; }
       const fv = felts.find((x) => x.sec === en.target);
       if (fv) { fv.hint.setVisible(en.intersectionRatio >= 0.55); return; }
-      if (en.target.classList.contains("who")) {
+      if (en.target.matches(".who, .mission")) {
         if (en.intersectionRatio >= 0.3) en.target.classList.add("in");
         else if (!en.isIntersecting) en.target.classList.remove("in");
         return;
@@ -1787,9 +1803,9 @@
     felts.forEach((f) => io.observe(f.sec));
     obViews.forEach((v) => io.observe(v.sec));
     io.observe($("#legend"));
-    document.querySelectorAll(".who").forEach((w) => io.observe(w));
+    document.querySelectorAll(".who, .mission").forEach((w) => io.observe(w));
   } else {
     scenes.forEach(sceneEnd);
-    document.querySelectorAll("#legend, .who").forEach((e) => e.classList.add("in"));
+    document.querySelectorAll("#legend, .who, .mission").forEach((e) => e.classList.add("in"));
   }
 })();
