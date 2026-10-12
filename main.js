@@ -132,8 +132,101 @@
     const a = val(sc.actual), f = val(sc.felt);
     let t = `실제 ${a}분`;
     if (f && f !== a) t += ` · 체감 ${f}분`;
-    if (isEst(sc.actual) || (f !== a && isEst(sc.felt))) t += " (추정)";
     return t;
+  }
+
+
+  /* ---------- 지형 그리기 ---------- */
+  const OUT = { stroke: "var(--ink)", "stroke-width": 1.2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" };
+  const withOut = (a) => Object.assign({}, OUT, a);
+  // 물결 테두리 덩어리 (나무)
+  function scallop(cx, cy, r, n = 9, rot = 0) {
+    let d = "";
+    for (let i = 0; i <= n; i++) {
+      const a = rot + (i / n) * Math.PI * 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (i === 0) d += `M${f1(x)} ${f1(y)}`;
+      else d += ` A${f1(r * 0.36)} ${f1(r * 0.36)} 0 0 1 ${f1(x)} ${f1(y)}`;
+    }
+    return d + " Z";
+  }
+  function star(x, y, r) {
+    const q = r * 0.28;
+    return `M${x} ${y - r} L${x + q} ${y - q} L${x + r} ${y} L${x + q} ${y + q} L${x} ${y + r} L${x - q} ${y + q} L${x - r} ${y} L${x - q} ${y - q} Z`;
+  }
+  function inPoly(p, poly) {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  const near = (p, pts, d) => pts.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < d);
+  const PARK_C = PARK.reduce((c, p) => [c[0] + p[0] / PARK.length, c[1] + p[1] / PARK.length], [0, 0]);
+  const TREES = [[430, 330, 34], [515, 290, 30], [600, 330, 36], [372, 410, 30], [462, 405, 38], [556, 412, 32],
+    [646, 392, 28], [412, 500, 32], [508, 495, 36], [600, 478, 30], [342, 318, 24], [690, 330, 22], [470, 560, 22], [300, 470, 20]];
+  const TREE_FILLS = ["var(--tree-1)", "var(--tree-2)", "var(--tree-3)"];
+  const BLOCK_FILLS = ["var(--blk-1)", "var(--blk-2)", "var(--blk-3)", "var(--blk-4)", "#ffffff"];
+  // NODE 03이 일어난 넓은 차도: illus가 "road"인 장면의 기본 경로 위
+  const ROAD_J = SCENES.findIndex((s) => s.illus === "road");
+  const ROAD_PTS = [];
+  if (ROAD_J >= 0 && SEGS[ROAD_J]) {
+    const g = SEGS[ROAD_J];
+    for (let x = g.s0 - 70; x <= g.s1 + 70; x += 8) ROAD_PTS.push(P(x));
+  }
+
+  function drawTerrain(svg, boxes) {
+    const [vx, vy, vw, vh] = VIEW.split(" ").map(Number);
+    // 바다
+    el("rect", { x: vx - 400, y: vy - 400, width: vw + 800, height: vh + 800, fill: "var(--sea)" }, svg);
+    [[230, 215], [800, 250], [215, 610], [880, 600], [600, 150], [330, 820]].forEach(([x, y]) =>
+      el("path", withOut({ d: `M${x} ${y} q7 -6 14 0 t14 0 t14 0`, fill: "none" }), svg));
+    // 시내 + 건물 블록
+    el("path", withOut({ d: "M" + CITY.map(pt).join(" L") + " Z", fill: "var(--land)" }), svg);
+    const blocks = el("g", {}, svg);
+    let n = 0;
+    for (let gx = -6; gx < 16; gx++) {
+      for (let gy = -2; gy < 10; gy++) {
+        const c = [300 + gx * 46 + gy * 22, 560 + gy * 40 - gx * 10];
+        if (!inPoly(c, CITY) || near(c, SAMPLES, 30) || near(c, ROAD_PTS, 34)) continue;
+        if (![[18, 0], [-18, 0], [0, 16], [0, -16]].every((o) => inPoly(add(c, o), CITY))) continue;
+        el("rect", withOut({ x: f1(c[0] - 16), y: f1(c[1] - 13), width: 32, height: 26, rx: 2, fill: BLOCK_FILLS[(n++ * 7 + gx * 3 + 50) % BLOCK_FILLS.length], transform: `rotate(-14 ${f1(c[0])} ${f1(c[1])})` }), blocks);
+      }
+    }
+    // 공원 땅
+    el("path", withOut({ d: smoothClosedPath(PARK), fill: "var(--grass)" }), svg);
+    // 둘레길 (공원 가장자리를 도는 길)
+    const wall = smoothClosedPath(PARK.map((p) => [PARK_C[0] + (p[0] - PARK_C[0]) * 0.93, PARK_C[1] + (p[1] - PARK_C[1]) * 0.93]));
+    el("path", { d: wall, fill: "none", stroke: "var(--ink)", "stroke-width": 12 }, svg);
+    el("path", { d: wall, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6 }, svg);
+    // 숲
+    TREES.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3] }), svg));
+    // 넓은 차도와 차
+    if (ROAD_PTS.length > 1) {
+      const rd = "M" + ROAD_PTS.map(pt).join(" L");
+      el("path", { d: rd, fill: "none", stroke: "var(--ink)", "stroke-width": 34, "stroke-linejoin": "round" }, svg);
+      el("path", { d: rd, fill: "none", stroke: "var(--road)", "stroke-width": 31.6, "stroke-linejoin": "round" }, svg);
+      el("path", { d: rd, fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-dasharray": "10 9" }, svg);
+      [0.18, 0.47, 0.8].forEach((f, i) => {
+        const k = Math.floor(f * (ROAD_PTS.length - 2)), a = ROAD_PTS[k], b = ROAD_PTS[k + 1];
+        const ang = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+        const nrm = norm([-(b[1] - a[1]), b[0] - a[0]]), c = add(a, nrm, i % 2 ? 7.5 : -7.5);
+        const car = el("g", { transform: `translate(${f1(c[0])} ${f1(c[1])}) rotate(${f1(ang)})` }, svg);
+        el("rect", withOut({ x: -11, y: -5.5, width: 22, height: 11, rx: 3, fill: ["var(--car-1)", "var(--car-2)", "var(--car-3)"][i] }), car);
+        el("rect", withOut({ x: 1, y: -3.5, width: 6, height: 7, rx: 1, fill: "#fff" }), car);
+      });
+    }
+    // 자전거 대여점
+    const sh = add(SAMPLES[0], [8, 52]);
+    const shop = el("g", { transform: `translate(${f1(sh[0])} ${f1(sh[1])})` }, svg);
+    el("rect", withOut({ x: -20, y: -14, width: 40, height: 26, fill: "var(--blk-2)" }), shop);
+    el("path", withOut({ d: "M-25 -13 L0 -30 L25 -13 Z", fill: "var(--car-1)" }), shop);
+    el("rect", withOut({ x: -6, y: -2, width: 12, height: 14, fill: "#fff" }), shop);
+    [-13, 13].forEach((x) => el("circle", withOut({ cx: x, cy: 4, r: 4.5, fill: "#fff" }), shop));
+    boxes.push([sh[0] - 27, sh[1] - 32, sh[0] + 27, sh[1] + 14]);
+    // 빈 곳에 별과 점 조금
+    [[190, 175, 7], [885, 300, 6], [180, 830, 6], [890, 790, 7]].forEach(([x, y, r]) => el("path", withOut({ d: star(x, y, r), fill: "var(--blk-2)" }), svg));
+    [[640, 140, 3.5], [250, 520, 3], [870, 680, 3]].forEach(([x, y, r]) => el("circle", withOut({ cx: x, cy: y, r, fill: "#fff" }), svg));
   }
 
   let maskId = 0;
@@ -142,28 +235,18 @@
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const uid = "m" + (maskId++);
     const defs = el("defs", {}, svg);
-    const clip = el("clipPath", { id: uid + "city" }, defs);
-    el("path", { d: "M" + CITY.map(pt).join(" L") + " Z" }, clip);
 
-    // 땅
-    el("path", { d: smoothClosedPath(PARK), fill: "var(--park)" }, svg);
-    const city = el("g", { "clip-path": `url(#${uid}city)` }, svg);
-    for (let k = -12; k < 20; k++) {
-      el("line", { x1: 300 + k * 34, y1: 470, x2: 300 + k * 34 - 260, y2: 900, stroke: "var(--street)", "stroke-width": 1.3 }, city);
-      el("line", { x1: 300 + k * 34 - 300, y1: 470, x2: 300 + k * 34 + 120, y2: 900, stroke: "var(--street)", "stroke-width": 1.3 }, city);
-    }
-    // 지명
+    // 지형 (얇은 검정 외곽선 + 단색 면)
     const boxes = []; // 글자끼리 겹치지 않게 차지한 자리
-    const place = (x, y, t, size = 13, anchor = "middle", fill = "var(--ink-3)") => {
-      el("text", { x, y, "text-anchor": anchor, "font-family": "Archivo Black, sans-serif", "font-size": size, fill, "letter-spacing": "0.04em" }, svg).textContent = t;
-      const w = t.length * size * 0.72, x0 = anchor === "end" ? x - w : anchor === "start" ? x : x - w / 2;
-      if (size < 20) boxes.push([x0 - 4, y - size, x0 + w + 4, y + 4]);
+    drawTerrain(svg, boxes);
+    const place = (x, y, t, anchor = "middle") => {
+      el("text", { x, y, "text-anchor": anchor, "font-family": "Archivo Black, sans-serif", "font-size": 12, fill: "var(--sea-ink)", "letter-spacing": "0.06em" }, svg).textContent = t;
+      const w = t.length * 12 * 0.72, x0 = anchor === "end" ? x - w : anchor === "start" ? x : x - w / 2;
+      boxes.push([x0 - 4, y - 12, x0 + w + 4, y + 4]);
     };
-    place(500, 440, "STANLEY PARK", 30, "middle", "#bdbdb9");
     place(205, 690, "ENGLISH BAY");
-    place(845, 452, "COAL HARBOUR", 13, "end");
-    place(500, 165, "BURRARD INLET");
-    place(790, 860, "DOWNTOWN");
+    place(845, 452, "COAL HARBOUR", "end");
+    place(500, 160, "BURRARD INLET");
 
     const segs = SEGS.map((g, j) => {
       if (!g) return null;
@@ -365,6 +448,7 @@
   /* ---------- 1. 첫 화면 ---------- */
   document.querySelectorAll(".hero .corner").forEach((c) => { c.textContent = TEXT.corner[+c.dataset.t]; });
   $("#hero-q").textContent = TEXT.question;
+  $("#hero-def").innerHTML = `<b>${esc(TEXT.definition[0])}</b> — ${esc(TEXT.definition[1])}`;
   $("#hero-scroll").textContent = TEXT.scroll;
   $(".hero-curve").innerHTML = `
     <path d="M40 120 C160 20 240 30 300 80 C360 130 470 150 560 40" fill="none" stroke="var(--blue)" stroke-width="4"/>
@@ -377,177 +461,176 @@
   const map = buildMap($("#map"));
   $("#howto").innerHTML = `<h2>How to read</h2><ul>${RULES.slice(0, 5).map(([k, a, b]) => `<li>${ruleSvg(k)}<span><b>${a}</b> = ${b}</span></li>`).join("")}</ul>`;
 
-  // 큰 바퀴
-  const wheelRot = $("#wheel-rot");
-  (function buildWheel() {
-    let s = "";
-    for (let k = 0; k < 36; k++) {
-      const a = (k / 36) * Math.PI * 2;
-      s += `<line x1="${f1(Math.cos(a) * 30)}" y1="${f1(Math.sin(a) * 30)}" x2="${f1(Math.cos(a) * 85)}" y2="${f1(Math.sin(a) * 85)}" stroke="var(--ink-3)" stroke-width="0.5"/>`;
-    }
-    [45, 135, 225, 315].forEach((deg) => {
-      const a = (deg * Math.PI) / 180, x = Math.cos(a) * 85, y = Math.sin(a) * 85;
-      s += `<rect x="${f1(x - 3)}" y="${f1(y - 3)}" width="6" height="6" fill="var(--bg)" stroke="var(--blue)" stroke-width="1.2"/>`;
-    });
-    s += `<circle cx="0" cy="-78" r="3.2" fill="var(--pink)"/>`;
-    wheelRot.innerHTML = s;
-    const svg = wheelRot.ownerSVGElement;
-    el("circle", { r: 75, fill: "var(--bg)" }, svg);
-    el("circle", { r: 85, fill: "none", stroke: "var(--ink)", "stroke-width": 1 }, svg);
-    el("circle", { r: 93, fill: "none", stroke: "var(--ink)", "stroke-width": 9 }, svg);
+  /* ---------- NODE 화면 ----------
+     왼쪽 가장자리에 걸친 바퀴 (바퀴살과 중심축만)
+     빨간 직선 = 실제 거리(실제 시간, 고정) / 회색 펜툴 곡선 = 체감 경로
+     오른쪽 핸들만 당길 수 있고, 곡선 길이 ÷ 직선 길이 × 실제 시간 = 체감 시간  */
+  const ILLUS = (function () {
+    const o = 'stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
+    const tree = (x, y, r, fill, rot = 0) => `<path ${o} fill="${fill}" d="${scallop(x, y, r, 8, rot)}"/>`;
+    return {
+      // 숲길 갈림길, 입구 표지판 없음, 멀리 사람 한 명
+      fork: `<rect ${o} width="200" height="140" fill="var(--grass)"/>
+        <path ${o} fill="var(--sand)" d="M86 140 L92 96 L32 36 L48 30 L100 82 L152 30 L168 36 L108 96 L114 140 Z"/>
+        ${tree(22, 92, 20, "var(--tree-1)")}${tree(178, 98, 22, "var(--tree-2)", 1)}${tree(100, 26, 18, "var(--tree-3)", 2)}${tree(58, 128, 14, "var(--tree-2)", 3)}${tree(150, 132, 12, "var(--tree-1)")}
+        <rect ${o} x="128" y="74" width="4" height="30" fill="#fff"/><rect ${o} x="116" y="62" width="28" height="14" fill="#fff"/>
+        <circle ${o} cx="156" cy="40" r="3.5" fill="var(--yellow)"/><rect ${o} x="153" y="44" width="6" height="9" rx="2" fill="var(--yellow)"/>
+        <path ${o} fill="#fff" d="${star(28, 22, 5)}"/>`,
+      // 휴대폰 말풍선이 가리키는 길은 점선으로만 있고 실제로는 나무만
+      phone: `<rect ${o} width="200" height="140" fill="var(--grass)"/>
+        ${tree(110, 40, 24, "var(--tree-1)")}${tree(152, 52, 22, "var(--tree-2)", 1)}${tree(184, 30, 18, "var(--tree-3)", 2)}${tree(132, 92, 20, "var(--tree-3)", 3)}${tree(176, 106, 20, "var(--tree-1)")}${tree(92, 100, 16, "var(--tree-2)")}
+        <path d="M60 118 C 90 100, 110 80, 140 66" fill="none" stroke="var(--pink)" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round"/>
+        <rect ${o} x="14" y="70" width="30" height="54" rx="5" fill="var(--pink-soft)"/><rect ${o} x="19" y="78" width="20" height="34" fill="#fff"/>
+        <path ${o} fill="#fff" d="M10 20 h70 a6 6 0 0 1 6 6 v20 a6 6 0 0 1 -6 6 h-44 l-10 12 l2 -12 h-18 a6 6 0 0 1 -6 -6 v-20 a6 6 0 0 1 6 -6 z"/>
+        <path d="M20 38 h40" stroke="var(--pink)" stroke-width="2.4" stroke-dasharray="2 5" stroke-linecap="round"/><path ${o} fill="var(--pink)" d="M60 33 l10 5 l-10 5 z"/>`,
+      // 차가 많은 도로 위 작은 자전거, 휴대폰 화살표는 앞을 가리킴
+      road: `<rect ${o} width="200" height="140" fill="var(--land)"/>
+        <path ${o} fill="var(--road)" d="M0 44 L200 30 L200 112 L0 126 Z"/>
+        <path d="M0 85 L200 71" stroke="#fff" stroke-width="2" stroke-dasharray="12 9"/>
+        ${[[30, 58, "var(--car-1)"], [112, 52, "var(--car-2)"], [150, 86, "var(--car-3)"], [62, 100, "var(--car-2)"]].map(([x, y, c]) => `<g transform="translate(${x} ${y}) rotate(-4)"><rect ${o} x="-16" y="-8" width="32" height="16" rx="4" fill="${c}"/><rect ${o} x="2" y="-5" width="9" height="10" rx="1.5" fill="#fff"/></g>`).join("")}
+        <g transform="translate(98 116)"><circle ${o} cx="-6" cy="0" r="5" fill="#fff"/><circle ${o} cx="6" cy="0" r="5" fill="#fff"/><path ${o} fill="none" d="M-6 0 L-1 -7 L5 -7 L6 0 M-1 -7 L0 0"/><circle ${o} cx="1" cy="-13" r="2.6" fill="var(--ink)"/></g>
+        <rect ${o} x="160" y="6" width="26" height="40" rx="4" fill="var(--pink-soft)"/><path ${o} fill="var(--pink)" d="M173 12 l7 10 h-4.5 v14 h-5 v-14 h-4.5 z"/>`
+    };
   })();
 
-  function cardHtml(sc) {
-    const src = sc.guide.source;
-    const dot = (c) => `<i style="${c ? `background:${c}` : "border:1px solid var(--ink)"}"></i>`;
-    const photo = sc.photo
-      ? `<div class="card-photo missing" id="card-photo"><span>PHOTO · ${esc(sc.photo)}</span></div>`
-      : `<div class="card-photo missing"><span class="ph">${esc(sc.photoNote || "사진 없음")}</span></div>`;
-    return `
-      <span class="card-node">${esc(sc.label)}</span>
-      ${photo}
-      <p class="card-row"><b>${dot(src ? COLOR[src] : "")}GUIDE</b><span>${esc(sc.guide.text)}${isEst(sc.guide) ? EST : ""}</span></p>
-      <p class="card-row"><b>${dot("var(--blue)")}SPACE</b><span>${esc(sc.space.text)}</span></p>
-      <p class="card-rel">${esc(val(sc.relation))}${isEst(sc.relation) ? EST : ""}</p>
-      ${sc.memory ? `<p class="card-mem">기억: ${esc(sc.memory)}</p>` : ""}`;
-  }
-
-  /* ---------- 펜툴 핸들로 체감시간 늘리기 ----------
-     두 앵커 사이 거리 = 실제 시간 (고정)
-     곡선 길이 ÷ 직선 길이 × 실제 시간 = 체감 시간                     */
-  const pullBox = $("#pull");
-  const pull = (function () {
-    const A = [130, 190], B = [230, 190], CHORD = B[0] - A[0];
-    const REST = [A[0] + 24, A[1] - 7];        // 처음 핸들: 짧아서 거의 직선
-    const SNAP = 0.35;                         // 기록된 체감 비율과 이만큼 가까우면 딱 맞춤
-    const mirror = (c) => [A[0] + B[0] - c[0], c[1]];
-    const bez = (c1, c2, t) => {
-      const u = 1 - t;
-      return [0, 1].map((k) => u * u * u * A[k] + 3 * u * u * t * c1[k] + 3 * u * t * t * c2[k] + t * t * t * B[k]);
-    };
-    const lenOf = (c1) => {
-      const c2 = mirror(c1);
-      let L = 0, prev = A;
-      for (let i = 1; i <= 64; i++) { const p = bez(c1, c2, i / 64); L += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p; }
-      return L;
-    };
-    const dOf = (c1) => `M${pt(A)} C${pt(c1)} ${pt(mirror(c1))} ${pt(B)}`;
-    // 기록된 체감 비율이 되는 핸들 (바깥 위쪽으로 뻗은 방향에서 길이를 찾음)
-    function ghostFor(r) {
-      if (r <= 1.02) return [A[0] + CHORD / 3, A[1]];
-      const dir = [Math.cos((115 * Math.PI) / 180), -Math.sin((115 * Math.PI) / 180)];
-      let lo = 0, hi = 2000;
-      for (let n = 0; n < 40; n++) {
-        const m = (lo + hi) / 2;
-        if (lenOf(add(A, dir, m)) / CHORD < r) lo = m; else hi = m;
-      }
-      return add(A, dir, lo);
+  const nodeView = (function () {
+    const svg = $("#node-svg"), media = $("#node-media"), sentence = $("#node-sentence");
+    const C1U = [0.2, -0.08], REST2U = [0.8, -0.08];
+    const DIR = [Math.cos((100 * Math.PI) / 180), -Math.sin((100 * Math.PI) / 180)];
+    const bz = (a, b, c, d, t) => { const u = 1 - t; return [0, 1].map((k) => u * u * u * a[k] + 3 * u * u * t * b[k] + 3 * u * t * t * c[k] + t * t * t * d[k]); };
+    const lenOf = (a, b, c, d) => { let L = 0, q0 = a; for (let i = 1; i <= 80; i++) { const q = bz(a, b, c, d, i / 80); L += Math.hypot(q[0] - q0[0], q[1] - q0[1]); q0 = q; } return L; };
+    const ratioU = (c2u) => lenOf([0, 0], C1U, c2u, [1, 0]);
+    const REST_R = ratioU(REST2U);
+    // 기록된 체감 비율이 되는 오른쪽 핸들 위치 (위로 뻗은 방향에서 길이를 찾음)
+    function ghostU(r) {
+      if (r <= REST_R + 0.03) return REST2U.slice();
+      let lo = 0, hi = 50;
+      for (let n = 0; n < 50; n++) { const m = (lo + hi) / 2; if (ratioU(add([1, 0], DIR, m)) < r) lo = m; else hi = m; }
+      return add([1, 0], DIR, lo);
     }
-    const mmss = (min) => { const s = Math.round(min * 60); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+    function bboxU(c2u) {
+      let x1 = 1, y0 = 0;
+      for (let i = 0; i <= 40; i++) { const q = bz([0, 0], C1U, c2u, [1, 0], i / 40); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); }
+      [C1U, c2u].forEach((q) => { x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); });
+      return { x1, y0 };
+    }
+    const NODES = SCENES.filter((s) => s.node);
+    const ratioOf = (s) => { const a = val(s.actual) || 1; return (val(s.felt) || a) / a; };
+    const RM = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    let sc, actual, r, ghost, c1, matched, dragging, anim, touched, refs;
+    let sc = null, W, H, G, A, B, chord, R, cx, c1, c2, rest, ghost, r, matched, anim, roll, spinRaf, touched, refs, active = false;
 
-    // 모든 NODE가 같은 축척을 쓰도록, 가장 크게 부푸는 점선까지 들어오는 상자 하나를 쓴다
-    const VB = [20, 40, 340, 230];
-    SCENES.filter((x) => x.node).forEach((x) => {
-      const a = val(x.actual) || 1, g = ghostFor((val(x.felt) || a) / a);
-      [g, mirror(g)].concat(Array.from({ length: 21 }, (_, i) => bez(g, mirror(g), i / 20))).forEach((q) => {
-        VB[0] = Math.min(VB[0], q[0] - 20); VB[2] = Math.max(VB[2], q[0] + 20); VB[1] = Math.min(VB[1], q[1] - 24);
+    function geometry() {
+      W = svg.clientWidth; H = svg.clientHeight;
+      const wide = W >= 900 && W / H >= 1.2;
+      R = wide ? Math.min(H * 0.33, W * 0.2) : Math.min(H * 0.17, W * 0.34);
+      G = H * 0.7;
+      cx = R * 0.62;
+      A = [cx, G];
+      const mb = media.getBoundingClientRect(), sb = svg.getBoundingClientRect();
+      const top = wide ? 70 : mb.bottom - sb.top + 40;
+      const xLimit = wide ? Math.min(W * 0.64, mb.left - sb.left - 30) : W - 24;
+      // 모든 NODE가 같은 축척(1분 = 같은 길이)
+      let k = Infinity;
+      NODES.forEach((s) => {
+        const bb = bboxU(ghostU(ratioOf(s))), a = val(s.actual) || 1;
+        k = Math.min(k, (G - top) / Math.max(0.1, -bb.y0) / a, (xLimit - A[0]) / bb.x1 / a);
       });
-    });
+      chord = (val(sc.actual) || 1) * k;
+      B = [A[0] + chord, G];
+      const px = (u) => [A[0] + u[0] * chord, G + u[1] * chord];
+      c1 = px(C1U); rest = px(REST2U);
+      r = ratioOf(sc);
+      ghost = px(ghostU(r));
+    }
+    const dOf = (q) => `M${pt(A)} C${pt(c1)} ${pt(q)} ${pt(B)}`;
+    const ring = (ro, ri) => `M${ro} 0 A${ro} ${ro} 0 1 0 ${-ro} 0 A${ro} ${ro} 0 1 0 ${ro} 0 Z M${ri} 0 A${ri} ${ri} 0 1 0 ${-ri} 0 A${ri} ${ri} 0 1 0 ${ri} 0 Z`;
+    const minLabel = (m) => `${Math.round(m)}분`;
 
-    function setup(scene) {
-      sc = scene;
-      actual = val(sc.actual) || 0;
-      r = (val(sc.felt) || actual) / (actual || 1);
-      ghost = ghostFor(r);
-      c1 = REST.slice();
-      matched = false; dragging = false; touched = false;
-      cancelAnimationFrame(anim);
-
-      const [x0, y0, x1, y1] = VB;
-      const src = sc.guide && sc.guide.source;
-      const hc = src ? COLOR[src] : "var(--ink-3)";
-      const est = isEst(sc.felt) || isEst(sc.actual);
-      const top = Array.from({ length: 41 }, (_, i) => bez(ghost, mirror(ghost), i / 40)).reduce((a, p) => (p[1] < a[1] ? p : a), [0, Infinity]);
-      const estAt = r <= 1.02 ? [(A[0] + B[0]) / 2, A[1] - 10] : [top[0], top[1] - 10];
-
-      pullBox.innerHTML = `
-        <svg viewBox="${f1(x0)} ${f1(y0)} ${f1(x1 - x0)} ${f1(y1 - y0)}" aria-label="핸들을 당겨 체감 시간을 늘려보는 펜툴 곡선">
-          <path d="${dOf(ghost)}" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
-          ${est ? `<text x="${f1(estAt[0])}" y="${f1(estAt[1])}" text-anchor="middle" class="pull-est">추정</text>` : ""}
-          <path class="pull-curve" fill="none" stroke="var(--blue)" stroke-width="4" stroke-linecap="round"/>
-          <g class="pull-h" data-k="0"><line stroke="${hc}" stroke-width="1.6"/><circle class="knob" r="7" fill="${hc}"/><circle class="hit" r="22" fill="transparent"/></g>
-          <g class="pull-h" data-k="1"><line stroke="${hc}" stroke-width="1.6"/><circle class="knob" r="7" fill="${hc}"/><circle class="hit" r="22" fill="transparent"/></g>
-          ${[A, B].map((p) => `<rect x="${p[0] - 6}" y="${p[1] - 6}" width="12" height="12" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/>`).join("")}
-          <text class="pull-hint" x="${A[0] - 4}" y="${A[1] - 26}" text-anchor="end">${esc(TEXT.pullHint)} →</text>
-        </svg>
-        <p class="pull-read"></p>
-        <p class="pull-msg"></p>`;
-      const svg = pullBox.querySelector("svg");
+    function render() {
+      geometry();
+      svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
+      const src = sc.guide && sc.guide.source, hc = src ? COLOR[src] : "var(--ink)";
+      const est = isEst(sc.actual) || isEst(sc.felt);
+      let spokes = "";
+      for (let i = 0; i < 32; i++) {
+        const a = (i / 32) * Math.PI * 2;
+        spokes += `<line x1="${f1(Math.cos(a) * R * 0.07)}" y1="${f1(Math.sin(a) * R * 0.07)}" x2="${f1(Math.cos(a) * R * 0.86)}" y2="${f1(Math.sin(a) * R * 0.86)}"/>`;
+      }
+      const rw = 13;
+      svg.innerHTML = `
+        <line class="n-ground" x1="0" y1="${f1(G)}" x2="${f1(W)}" y2="${f1(G)}"/>
+        <g transform="translate(${f1(cx)} ${f1(G - R)})"><g class="n-wheel">
+          <path class="n-tire" fill-rule="evenodd" d="${ring(f1(R), f1(R * 0.86))}"/>
+          <g class="n-spokes">${spokes}</g>
+          <circle class="n-hub" r="${f1(R * 0.07)}"/>
+        </g></g>
+        <path class="n-ghost" d="${dOf(ghost)}"/>
+        <line class="n-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
+        <path class="n-curve"/>
+        <line class="n-handle" stroke="${hc}" x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(c1[0])}" y2="${f1(c1[1])}"/>
+        <circle class="n-knob" fill="${hc}" r="5.5" cx="${f1(c1[0])}" cy="${f1(c1[1])}"/>
+        <g class="n-drag"><line class="n-handle" stroke="${hc}"/><circle class="n-knob" fill="${hc}" r="8"/><circle class="n-hit" r="26"/></g>
+        ${[A, B].map((q) => `<rect class="n-anchor" x="${f1(q[0] - 6)}" y="${f1(q[1] - 6)}" width="12" height="12"/>`).join("")}
+        <text class="n-label n-real-t" x="${f1((A[0] + B[0]) / 2)}" y="${f1(G + 30)}" text-anchor="middle">실제 ${minLabel(val(sc.actual))}${est ? '<tspan class="n-est" dx="8">추정</tspan>' : ""}</text>
+        <text class="n-label n-felt-t" text-anchor="middle"></text>
+        <text class="n-hint">${esc(TEXT.pullHint)}</text>
+        <g class="n-roll" visibility="hidden"><g class="n-roll-w">
+          <circle class="n-tire-s" r="${rw}"/><line x1="${-rw}" y1="0" x2="${rw}" y2="0"/><line x1="0" y1="${-rw}" x2="0" y2="${rw}"/>
+        </g></g>`;
       refs = {
-        svg,
-        curve: svg.querySelector(".pull-curve"),
-        hs: [...svg.querySelectorAll(".pull-h")],
-        hint: svg.querySelector(".pull-hint"),
-        read: pullBox.querySelector(".pull-read"),
-        msg: pullBox.querySelector(".pull-msg")
+        wheel: svg.querySelector(".n-wheel"), curve: svg.querySelector(".n-curve"), ghost: svg.querySelector(".n-ghost"),
+        drag: svg.querySelector(".n-drag"), felt: svg.querySelector(".n-felt-t"), hint: svg.querySelector(".n-hint"),
+        roll: svg.querySelector(".n-roll"), rollW: svg.querySelector(".n-roll-w"), rw
       };
-      refs.hs.forEach((g) => g.addEventListener("pointerdown", (e) => start(e, +g.dataset.k)));
-      draw();
+      refs.hint.classList.toggle("off", touched);
+      refs.drag.addEventListener("pointerdown", start);
+      // 휴대폰: 핸들을 잡은 손가락은 화면을 스크롤하지 않게
+      refs.drag.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
     }
 
     function draw() {
-      const c2 = mirror(c1);
-      refs.curve.setAttribute("d", dOf(c1));
-      [[A, c1], [B, c2]].forEach(([a, c], k) => {
-        const g = refs.hs[k];
-        const ln = g.querySelector("line");
-        ln.setAttribute("x1", f1(a[0])); ln.setAttribute("y1", f1(a[1]));
-        ln.setAttribute("x2", f1(c[0])); ln.setAttribute("y2", f1(c[1]));
-        g.querySelectorAll("circle").forEach((ci) => { ci.setAttribute("cx", f1(c[0])); ci.setAttribute("cy", f1(c[1])); });
-      });
-      const felt = matched ? val(sc.felt) : actual * (lenOf(c1) / CHORD);
-      refs.read.innerHTML = `실제 <b>${mmss(actual)}</b><span>/</span>체감 <b>${mmss(felt)}</b>`;
+      refs.curve.setAttribute("d", dOf(c2));
+      const ln = refs.drag.querySelector("line");
+      ln.setAttribute("x1", f1(B[0])); ln.setAttribute("y1", f1(B[1]));
+      ln.setAttribute("x2", f1(c2[0])); ln.setAttribute("y2", f1(c2[1]));
+      refs.drag.querySelectorAll("circle").forEach((ci) => { ci.setAttribute("cx", f1(c2[0])); ci.setAttribute("cy", f1(c2[1])); });
+      // 체감 = 곡선 길이 ÷ 직선 길이 × 실제 시간
+      const felt = matched ? val(sc.felt) : (val(sc.actual) || 0) * (lenOf(A, c1, c2, B) / chord);
+      let top = [B[0], G];
+      for (let i = 0; i <= 40; i++) { const q = bz(A, c1, c2, B, i / 40); if (q[1] < top[1]) top = q; }
+      refs.felt.setAttribute("x", f1(clamp(top[0], 60, W - 60)));
+      refs.felt.setAttribute("y", f1(Math.min(top[1] - 16, G - 18)));
+      refs.felt.textContent = `체감 ${minLabel(felt)}`;
+      refs.hint.setAttribute("x", f1(c2[0] + 16));
+      refs.hint.setAttribute("y", f1(c2[1] - 14));
     }
-
-    function showMsg(text) {
-      refs.msg.innerHTML = `<span class="pull-line">${esc(text)}${isEst(sc.felt) ? EST : ""}</span>${sc.memory ? `<span class="pull-mem">기억: ${esc(sc.memory)}</span>` : ""}`;
-      refs.msg.classList.add("on");
-    }
-    function hideMsg() { refs.msg.classList.remove("on"); }
 
     function toSvg(e) {
-      const p = refs.svg.createSVGPoint();
-      p.x = e.clientX; p.y = e.clientY;
-      const q = p.matrixTransform(refs.svg.getScreenCTM().inverse());
-      const vb = refs.svg.viewBox.baseVal;
-      return [clamp(q.x, vb.x, vb.x + vb.width), clamp(q.y, vb.y, vb.y + vb.height)];
+      const b = svg.getBoundingClientRect();
+      return [clamp(e.clientX - b.left, A[0] + 10, W - 10), clamp(e.clientY - b.top, 8, G + 30)];
     }
 
-    function start(e, k) {
+    function start(e) {
       e.preventDefault();
       cancelAnimationFrame(anim);
-      dragging = true;
       if (!touched) { touched = true; refs.hint.classList.add("off"); }
       const target = e.currentTarget;
       try { target.setPointerCapture(e.pointerId); } catch (err) { /* 캡처가 안 돼도 드래그는 계속 */ }
       const move = (ev) => {
-        const p = toSvg(ev);
-        const raw = k === 0 ? p : mirror(p);   // 반대쪽 핸들은 거울처럼 같이 움직임
-        const ratio = lenOf(raw) / CHORD;
-        if (r > 1.05 && Math.abs(ratio - r) < SNAP) {
-          // 자석처럼 기록된 곡선에 딱 맞춤
-          c1 = ghost.slice();
-          if (!matched) { matched = true; showMsg(TEXT.pullMatch); }
+        const q = toSvg(ev);
+        const ratio = lenOf(A, c1, q, B) / chord;
+        if (r > REST_R + 0.1 && Math.abs(ratio - r) < r * 0.12) {
+          // 자석처럼 기록된 곡선에 딱 맞춤 → 바퀴가 그 곡선을 따라 한 번 굴러감
+          c2 = ghost.slice();
+          if (!matched) { matched = true; rollOnce(); }
         } else {
-          c1 = raw;
-          if (matched) { matched = false; hideMsg(); }
+          c2 = q;
+          matched = false;
         }
         draw();
       };
       const end = () => {
-        dragging = false;
         target.removeEventListener("pointermove", move);
         target.removeEventListener("pointerup", end);
         target.removeEventListener("pointercancel", end);
@@ -560,19 +643,79 @@
 
     // 점선까지 못 당기고 놓으면 천천히 제자리로
     function springBack() {
-      const from = c1.slice(), t0 = performance.now(), dur = r > 1.05 ? 900 : 450;
+      const from = c2.slice(), t0 = performance.now(), dur = r > REST_R + 0.1 ? 900 : 380;
       const step = (now) => {
-        if (dragging) return;
         const t = clamp((now - t0) / dur), e = 1 - Math.pow(1 - t, 3);
-        c1 = [lerp(from[0], REST[0], e), lerp(from[1], REST[1], e)];
+        c2 = [lerp(from[0], rest[0], e), lerp(from[1], rest[1], e)];
         draw();
         if (t < 1) anim = requestAnimationFrame(step);
-        else if (r <= 1.05) showMsg(TEXT.pullSame);  // 체감 = 실제인 장면: 금방 돌아오고 끝
       };
       anim = requestAnimationFrame(step);
     }
 
-    return { setup };
+    function rollOnce() {
+      cancelAnimationFrame(roll);
+      const path = refs.ghost, L = path.getTotalLength(), t0 = performance.now(), dur = RM.matches ? 1 : 1800;
+      refs.roll.setAttribute("visibility", "visible");
+      const step = (now) => {
+        const t = clamp((now - t0) / dur), d = L * t, q = path.getPointAtLength(d), q2 = path.getPointAtLength(Math.min(L, d + 1));
+        const nv = norm([q2.y - q.y, -(q2.x - q.x)]);
+        const c = add([q.x, q.y], nv, refs.rw + 2);
+        refs.roll.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])})`);
+        refs.rollW.setAttribute("transform", `rotate(${f1((d / refs.rw) * 57.3)})`);
+        if (t < 1) roll = requestAnimationFrame(step);
+      };
+      roll = requestAnimationFrame(step);
+    }
+
+    // NODE 03(이동)은 바퀴가 계속 돌고, NODE 01·02(멈춤)는 멈춰 있다
+    function spinLoop(now) {
+      if (!active) return;
+      if (sc && sc.moving && !RM.matches) refs.wheel.setAttribute("transform", `rotate(${f1(((now / 1000) * 90) % 360)})`);
+      spinRaf = requestAnimationFrame(spinLoop);
+    }
+
+    function photoHtml() {
+      if (!sc.photo) return `<figure class="polaroid empty"><div class="ph"><span>${esc(TEXT.noPhoto)}</span></div></figure>`;
+      return `<figure class="polaroid"><div class="ph missing" id="node-ph"><span>photos/${esc(sc.photo)}</span></div></figure>`;
+    }
+
+    function setup(scene) {
+      sc = scene;
+      matched = false; touched = false;
+      cancelAnimationFrame(anim); cancelAnimationFrame(roll);
+      media.innerHTML = `<p class="node-head"><span class="en">${esc(sc.label)}</span>${esc(sc.title)}</p>
+        <div class="node-pics"><div class="illus"><svg viewBox="0 0 200 140" aria-hidden="true">${ILLUS[sc.illus] || ""}</svg></div>${photoHtml()}</div>`;
+      const ph = $("#node-ph");
+      if (ph) {
+        // 사진이 있으면 보이고, 없으면 회색 자리표시로 남는다
+        const img = new Image();
+        img.alt = "";
+        img.onload = () => ph.classList.remove("missing");
+        img.src = "photos/" + sc.photo;
+        ph.appendChild(img);
+      }
+      sentence.textContent = sc.sentence || "";
+      render();
+      c2 = rest.slice();
+      draw();
+    }
+
+    function setActive(on) {
+      if (on === active) return;
+      active = on;
+      if (on) spinRaf = requestAnimationFrame(spinLoop);
+      else cancelAnimationFrame(spinRaf);
+    }
+
+    function relayout() {
+      if (!sc) return;
+      render();
+      c2 = (matched ? ghost : rest).slice();
+      draw();
+    }
+
+    return { setup, setActive, relayout };
   })();
 
   // 스크롤 구간: 구간 길이(vh)로만 속도를 표현한다. 스크롤 자체는 건드리지 않음.
@@ -589,9 +732,9 @@
   const ride = $("#ride"), stage = $("#stage");
   ride.style.height = `calc(${start + 100} * 1svh)`;
 
-  const close = $("#close"), closeWheel = $("#close-wheel"), card = $("#card"), closeAct = $("#close-act"), closeSide = $("#close-side");
-  const howto = $("#howto"), clock = $("#clock"), clockEst = $("#clock-est"), hudLabel = $("#hud-label"), hudTitle = $("#hud-title");
-  let cardFor = -1, ticking = false;
+  const close = $("#close");
+  const howto = $("#howto"), hudTitle = $("#hud-title");
+  let nodeFor = -1, ticking = false;
 
   function update() {
     ticking = false;
@@ -620,56 +763,30 @@
     if (it.type === "arrive" || it.type === "end") { bj = SCENES.length - 2; while (bj > 0 && !SEGS[bj]) bj--; bf = 1; }
     placeBike(map, bj, bf, spin);
 
-    // 귀퉁이 정보
-    let mins = 0, est = false;
-    SCENES.forEach((sc, j) => { if (fs[j] > 0) { mins += (val(sc.actual) || 0) * fs[j]; est = est || isEst(sc.actual); } });
-    clock.textContent = Math.round(mins);
-    clockEst.textContent = est ? "추정" : "";
     const sc = SCENES[it.i];
-    hudLabel.textContent = sc.label;
     hudTitle.textContent = sc.title;
 
     howto.style.opacity = it.type === "intro" ? (1 - ease((t - 0.55) / 0.35)).toFixed(3) : 0;
 
-    // 바퀴 클로즈업
+    // NODE 화면: 들어오면 지도는 완전히 숨김
     if (it.type === "close") {
-      if (cardFor !== it.i) {
-        cardFor = it.i;
-        card.innerHTML = cardHtml(sc);
-        const ph = $("#card-photo");
-        if (ph) {
-          // 사진이 있으면 보이고, 없으면 회색 자리표시로 남는다
-          const img = new Image();
-          img.alt = "";
-          img.onload = () => ph.classList.remove("missing");
-          img.src = "photos/" + sc.photo;
-          ph.appendChild(img);
-        }
-        closeAct.innerHTML = `<i class="dot" style="background:var(--ink)"></i><i class="lead"></i>${esc(sc.actionEn || "")}<span class="ko">${esc(sc.action)}</span>`;
-        pull.setup(sc);
-      }
-      const z = t < 0.15 ? ease(t / 0.15) : t > 0.85 ? ease((1 - t) / 0.15) : 1;
-      const b = map.bike.getBoundingClientRect(), s = stage.getBoundingClientRect();
-      // 바퀴의 원래 자리(변형 전) 중심에서 자전거 위치까지
-      const wx = closeWheel.offsetLeft + closeWheel.offsetWidth / 2, wy = closeWheel.offsetTop + closeWheel.offsetHeight / 2;
-      const dx = b.left + b.width / 2 - (s.left + wx), dy = b.top + b.height / 2 - (s.top + wy);
-      closeWheel.style.transform = `translate(${f1(dx * (1 - z))}px, ${f1(dy * (1 - z))}px) scale(${lerp(0.04, 1, z).toFixed(3)})`;
+      if (nodeFor !== it.i) { nodeFor = it.i; nodeView.setup(sc); }
+      const z = t < 0.12 ? ease(t / 0.12) : t > 0.88 ? ease((1 - t) / 0.12) : 1;
       close.classList.add("on");
-      close.style.opacity = clamp(z * 2.5).toFixed(3);
-      closeSide.style.opacity = clamp((z - 0.8) * 5).toFixed(3);
-      pullBox.classList.toggle("live", z > 0.97);
-      wheelRot.setAttribute("transform", sc.moving ? `rotate(${f1(t * 1080)})` : "");
-      stage.classList.toggle("dim", z > 0.05);
+      close.style.opacity = z.toFixed(3);
+      close.classList.toggle("live", z > 0.97);
+      stage.style.setProperty("--z", z.toFixed(3));
+      nodeView.setActive(true);
     } else {
-      close.classList.remove("on");
+      close.classList.remove("on", "live");
       close.style.opacity = 0;
-      pullBox.classList.remove("live");
-      stage.classList.remove("dim");
+      stage.style.setProperty("--z", 0);
+      nodeView.setActive(false);
     }
   }
   const request = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
   window.addEventListener("scroll", request, { passive: true });
-  window.addEventListener("resize", request);
+  window.addEventListener("resize", () => { nodeView.relayout(); request(); });
   update();
 
   /* ---------- 3. 완성된 한 바퀴 ---------- */

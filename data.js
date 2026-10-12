@@ -21,11 +21,14 @@
      memory   카드 아래 작은 글씨 "기억: ..."
      photo    photos 폴더의 파일 이름. 없으면 회색 자리표시
      photoNote 사진 자리에 대신 쓸 말 (사진이 없을 때)
+     sentence (NODE만) 클로즈업 화면 아래 한 문장
+     illus    (NODE만) 상황 일러스트: "fork" 숲길 갈림길 / "phone" 휴대폰 말풍선 / "road" 차도
    ========================================================= */
 
 const TEXT = {
   corner: ["STANLEY", "PARK", "길을 잃었다고", "느낀 순간"],
   question: "그날 나는 언제 길을 잃었다고 느꼈을까?",
+  definition: ["익숙함", "사람이나 지도의 안내가 눈앞의 공간과 맞아떨어지는 상태"],
   scroll: "SCROLL",
 
   thesis: [
@@ -35,10 +38,9 @@ const TEXT = {
   ],
   coda: "세 번 모두, 다시 이어준 건 사람이었다.",
 
-  // NODE 클로즈업의 펜툴 핸들
+  // NODE 클로즈업의 펜툴 핸들 안내
   pullHint: "핸들을 당겨보세요",
-  pullMatch: "그날 나는 이만큼 길게 느꼈다",
-  pullSame: "그날은 실제만큼 느꼈다",
+  noPhoto: "이 구간 사진 없음",
   footer: "정보디자인 · Stanley Park, Vancouver"
 };
 
@@ -63,7 +65,8 @@ const SCENES = [
     moving: false, action: "멈춤 → 근처 여성에게 물음", actionEn: "STOPPED",
     actual: { value: 10, estimated: true },
     felt: { value: 10, estimated: true },
-    memory: "당황했다", photo: "node01.jpg"
+    memory: "당황했다", photo: "node01.jpg",
+    sentence: "익숙한 것이 하나도 없었다. 나는 멈춰서 사람에게 물었다.", illus: "fork"
   },
   {
     label: "ASKED", title: "여성의 말로 다시 이어짐",
@@ -96,7 +99,8 @@ const SCENES = [
     moving: false, action: "멈춤 → 커플에게 물음", actionEn: "STOPPED",
     actual: { value: 10, estimated: true },
     felt: { value: 10, estimated: true },
-    memory: "", photo: "node02.jpg"
+    memory: "", photo: "node02.jpg",
+    sentence: "휴대폰이 말한 길이 눈앞에 없었다. 나는 멈춰서 사람에게 물었다.", illus: "phone"
   },
   {
     label: "ASKED", title: "커플의 설명으로 다시 이어짐",
@@ -119,7 +123,8 @@ const SCENES = [
     actual: { value: 7, estimated: false },
     felt: { value: 30, estimated: false },
     memory: "무엇이 맞는지 아무것도 판단할 수 없었다. 가장 불안했다.",
-    photo: "", photoNote: "사진 거의 없음"
+    photo: "", photoNote: "사진 거의 없음",
+    sentence: "익숙한 것과 멀어지자 시간은 길어졌고, 그만큼 불안했다.", illus: "road"
   },
   {
     label: "FOLLOWED", title: "앞사람을 따라감",

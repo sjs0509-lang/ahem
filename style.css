@@ -2,15 +2,40 @@
    style.css — 색은 맨 위 :root 에서 바꿀 수 있습니다.
    ========================================================= */
 :root {
-  --bg: #e4e4e1;        /* 연회색 배경 */
-  --park: #d4d4d0;      /* 공원 땅 */
-  --street: #cfcfcb;    /* 시내 길 */
-  --ink: #111111;
-  --ink-2: #555553;
-  --ink-3: #8a8a87;
-  --blue: #3f88e6;      /* 공간 = 경로 */
-  --yellow: #e2c014;    /* 사람 */
-  --pink: #d63cc9;      /* 휴대폰 */
+  /* 종이와 잉크 */
+  --bg: #f3efe6;
+  --ink: #1b1b1b;
+  --ink-2: #4f4d48;
+  --ink-3: #8a877f;
+  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.27  0 0 0 0 0.22  0.22 0 0 0 -0.05'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+
+  /* 정보 색: 공간(경로) 파랑 · 사람 노랑 · 휴대폰 분홍 */
+  --blue: #2f6fe0;
+  --yellow: #f2c014;
+  --pink: #e83fb4;
+  --pink-soft: #fbd3ec;
+
+  /* 지형 (파스텔 + 쨍한 색 조금) */
+  --sea: #c9e2f2;
+  --sea-ink: #3c6684;
+  --grass: #d7ecc0;
+  --tree-1: #8fd17f;
+  --tree-2: #5dbb6b;
+  --tree-3: #b7e09a;
+  --sand: #f6e2b0;
+  --land: #f8f4ea;
+  --road: #b4b4b0;
+  --blk-1: #f9cfc0;
+  --blk-2: #ffe08a;
+  --blk-3: #d8d0f4;
+  --blk-4: #bfe6df;
+  --car-1: #ff4b3e;
+  --car-2: #ffd02b;
+  --car-3: #3f7cf0;
+
+  /* NODE 화면 */
+  --red: #f0402f;    /* 실제 거리 */
+  --gray: #8c8c8c;   /* 체감 경로 */
 
   --en: "Archivo Black", "Arial Black", sans-serif;
   --ko: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -21,7 +46,8 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--noise);
   color: var(--ink);
   font-family: var(--ko);
   line-height: 1.5;
@@ -60,23 +86,22 @@ p { margin: 0; }
 .hero-curve { width: min(560px, 86vw); height: auto; overflow: visible; }
 .hero-q { font-size: clamp(17px, 2.4vw, 26px); font-weight: 600; letter-spacing: -0.02em; }
 .hero-scroll { margin-top: 10px; color: var(--ink-2); }
+.hero-def { font-size: clamp(13px, 1.3vw, 15px); color: var(--ink-2); max-width: 34em; }
+.hero-def b { font-weight: 800; color: var(--ink); }
 
 /* ---------- 2. 지도 위 한 바퀴 ---------- */
 .ride { position: relative; }
 .stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
-.stage .map { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .3s; }
-.stage.dim .map { opacity: 0.25; }
+.stage .map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage .map, .stage .hud { opacity: calc(1 - var(--z, 0)); }
 
 .hud { position: absolute; z-index: 2; pointer-events: none; }
 .hud.tl { top: var(--pad); left: var(--pad); font-size: clamp(20px, 2.6vw, 34px); line-height: 0.95; }
-.hud.tr { top: var(--pad); right: var(--pad); text-align: right; line-height: 0.9; }
-.hud.tr .en { font-size: clamp(40px, 7vw, 96px); }
-.hud.tr .unit { font-family: var(--en); font-size: clamp(12px, 1.4vw, 18px); margin-left: 6px; }
-.hud.bl { bottom: var(--pad); left: var(--pad); display: flex; flex-direction: column; gap: 4px; max-width: 60vw; }
-.hud-label { font-size: clamp(24px, 3.4vw, 46px); line-height: 0.95; }
+.hud.bl { bottom: var(--pad); left: var(--pad); max-width: 60vw; }
 .hud-title { font-weight: 800; font-size: clamp(16px, 1.8vw, 22px); letter-spacing: -0.02em; }
 .hud.br { bottom: var(--pad); right: var(--pad); }
 .key { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 11px; font-family: var(--en); letter-spacing: 0.03em; }
+.key-est { font-family: var(--ko); font-size: 10px; color: var(--ink-3); letter-spacing: 0; margin-top: 2px; }
 .key i { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: middle; }
 
 /* 읽는 법 (출발 전 잠깐) */
@@ -93,44 +118,60 @@ p { margin: 0; }
 .howto li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }
 .howto svg { width: 56px; height: 22px; overflow: visible; }
 
-/* 바퀴 클로즈업 */
+/* NODE 화면 */
 .close {
   position: absolute; inset: 0; z-index: 4;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-  pointer-events: none; opacity: 0; visibility: hidden;
+  background-color: var(--bg); background-image: var(--noise);
+  opacity: 0; visibility: hidden; pointer-events: none;
 }
 .close.on { visibility: visible; }
-.close-wheel {
-  --d: min(86vw, 74svh, 720px);
-  position: relative; width: var(--d); height: var(--d);
-  transform-origin: center;
+.node-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.close.live .n-drag { pointer-events: all; cursor: grab; }
+.close.live .n-drag:active { cursor: grabbing; }
+.n-ground { stroke: var(--ink); stroke-width: 1.2; }
+.n-tire { fill: #2b2b2b; stroke: var(--ink); stroke-width: 1.2; }
+.n-spokes line { stroke: var(--ink); stroke-width: 1; }
+.n-hub { fill: var(--blk-2); stroke: var(--ink); stroke-width: 1.2; }
+.n-ghost { fill: none; stroke: var(--gray); stroke-width: 2; stroke-dasharray: 1 7; stroke-linecap: round; }
+.n-real { stroke: var(--red); stroke-width: 3.5; }
+.n-curve { fill: none; stroke: var(--gray); stroke-width: 3; stroke-linecap: round; }
+.n-handle { stroke-width: 1.5; }
+.n-knob { stroke: var(--ink); stroke-width: 1.2; }
+.n-hit { fill: transparent; }
+.n-anchor { fill: #fff; stroke: var(--ink); stroke-width: 1.5; }
+.n-label { font-family: var(--ko); font-weight: 800; font-size: 18px; fill: var(--ink); }
+.n-real-t { fill: var(--red); }
+.n-est { font-size: 11px; font-weight: 500; fill: var(--ink-3); }
+.n-hint { font-family: var(--ko); font-size: 13px; font-weight: 600; fill: var(--ink-2); transition: opacity .3s; }
+.n-hint.off { opacity: 0; }
+.n-tire-s { fill: #fff; stroke: var(--ink); stroke-width: 1.5; }
+.n-roll line { stroke: var(--ink); stroke-width: 1; }
+
+.node-media { position: absolute; top: var(--pad); right: var(--pad); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.node-head { display: flex; align-items: baseline; gap: 8px; font-weight: 700; font-size: 14px; }
+.node-head .en { font-size: 13px; }
+.node-pics { display: flex; align-items: flex-start; gap: 16px; }
+.illus { width: clamp(150px, 18vw, 240px); border: 1.2px solid var(--ink); line-height: 0; background: #fff; }
+.illus svg { width: 100%; height: auto; display: block; }
+.polaroid { margin: 0; width: clamp(96px, 10vw, 140px); background: #fff; border: 1.2px solid var(--ink); padding: 7px 7px 24px; transform: rotate(4deg); }
+.polaroid .ph {
+  position: relative; aspect-ratio: 1 / 1; overflow: hidden; background: #d9d6ce;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 4px;
+  font-size: 10px; color: #7d7a72; word-break: break-all;
 }
-.wheel { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.card {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: calc(var(--d) * 0.62);
-  display: flex; flex-direction: column; align-items: center; text-align: center;
-  gap: calc(var(--d) * 0.014);
-  font-size: calc(var(--d) * 0.027);
+.polaroid .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.polaroid .ph.missing img { display: none; }
+.polaroid.empty .ph { background: #fff; border: 1px dashed #b5b1a7; color: var(--ink-2); font-size: 11px; font-weight: 600; word-break: keep-all; }
+.node-sentence {
+  position: absolute; left: var(--pad); right: var(--pad); bottom: calc(var(--pad) + 6px);
+  text-align: center; font-weight: 800; font-size: clamp(17px, 2.1vw, 28px); letter-spacing: -0.03em; line-height: 1.4;
 }
-.card-node { font-family: var(--en); font-size: calc(var(--d) * 0.045); line-height: 1; }
-.card-photo {
-  width: 70%; aspect-ratio: 3 / 2; background: #c9c9c5; position: relative; overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--en); font-size: calc(var(--d) * 0.02); color: #8f8f8b; text-transform: uppercase; letter-spacing: 0.04em;
-  margin-bottom: calc(var(--d) * 0.01);
+@media (max-width: 899px), (max-aspect-ratio: 6/5) {
+  .node-media { left: var(--pad); align-items: stretch; }
+  .node-pics { justify-content: space-between; }
+  .illus { width: 58%; }
+  .polaroid { width: 32%; }
 }
-.card-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.card-photo.missing img { display: none; }
-.card-photo .ph { font-family: var(--ko); font-weight: 500; text-transform: none; letter-spacing: 0; }
-.card-row { display: flex; align-items: baseline; justify-content: center; gap: 0.6em; line-height: 1.35; }
-.card-row b { font-family: var(--en); font-weight: 400; font-size: 0.8em; letter-spacing: 0.04em; flex: none; }
-.card-row b i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.02em; }
-.card-rel { font-weight: 900; font-size: calc(var(--d) * 0.1); letter-spacing: -0.04em; line-height: 1.05; margin-top: calc(var(--d) * 0.01); }
-.card-mem { font-size: 0.85em; color: var(--ink-2); max-width: 80%; line-height: 1.4; }
-.close-act { color: var(--ink); background: var(--bg); padding: 2px 6px; }
-.close-act .ko { font-family: var(--ko); font-weight: 600; text-transform: none; letter-spacing: 0; margin-left: 8px; font-size: 13px; }
 
 /* ---------- 3. 완성된 한 바퀴 ---------- */
 .loop { position: relative; min-height: 100svh; padding: calc(var(--pad) + clamp(40px, 10vw, 140px)) var(--pad) var(--pad); display: flex; flex-direction: column; align-items: center; }
@@ -162,64 +203,17 @@ p { margin: 0; }
   .corner.en { font-size: 9.6vw; }
   .corner.ko { font-size: 7.4vw; }
   .hud.tl { font-size: 18px; }
-  .hud.tr .en { font-size: 40px; }
-  .hud-label { font-size: 24px; }
   .hud-title { font-size: 15px; }
   .key { font-size: 9px; }
-  .close-wheel { --d: min(94vw, 70svh); }
-  .card { width: calc(var(--d) * 0.66); font-size: calc(var(--d) * 0.031); }
-  .card-photo { width: 70%; }
-  .close-act .ko { font-size: 12px; }
   .note .lead { width: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stage .map, .howto { transition: none; }
+  .howto, .n-hint { transition: none; }
 }
 @media (max-width: 640px) {
   .loop .corner.en { font-size: 7vw; }
 }
 @media (max-width: 640px) {
   .loop .map { aspect-ratio: 2 / 3; max-height: none; }
-}
-
-/* ---------- NODE 클로즈업: 펜툴 핸들로 체감시간 늘리기 ---------- */
-.close-wheel { --d: min(86vw, 74svh, 720px, calc(100svh - 340px)); }
-.close-side { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.pull { width: min(340px, 86vw); pointer-events: none; text-align: center; }
-.pull.live { pointer-events: auto; }
-.pull svg { display: block; width: 100%; height: auto; max-height: 34svh; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
-.pull .pull-h { cursor: grab; }
-.pull .pull-h:active { cursor: grabbing; }
-.pull .knob { stroke: var(--ink); stroke-width: 1; }
-.pull-hint { font-family: var(--ko); font-size: 13px; font-weight: 600; fill: var(--ink-2); transition: opacity .3s; }
-.pull-hint.off { opacity: 0; }
-.pull-est { font-family: var(--ko); font-size: 11px; font-weight: 500; fill: var(--ink-3); }
-.pull-read { font-family: var(--en); font-size: 13px; letter-spacing: 0.03em; text-transform: uppercase; margin-top: 2px; }
-.pull-read b { font-weight: 400; font-size: 18px; margin-left: 4px; font-variant-numeric: tabular-nums; }
-.pull-read span { margin: 0 10px; color: var(--ink-3); }
-.pull-msg { min-height: 2.8em; margin-top: 6px; opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; }
-.pull-msg.on { opacity: 1; transform: none; }
-.pull-line { display: block; font-weight: 800; font-size: 16px; letter-spacing: -0.02em; }
-.pull-mem { display: block; font-size: 13px; color: var(--ink-2); margin-top: 2px; }
-
-@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
-  .close { flex-direction: row; gap: clamp(24px, 4vw, 64px); }
-  .close-wheel { --d: min(74svh, 720px, calc(100vw - 480px)); }
-  .close-side { width: 340px; align-items: flex-start; text-align: left; }
-  .pull { width: 340px; }
-  .pull svg { max-height: 44svh; }
-}
-@media (max-width: 640px) {
-  .close-wheel { --d: min(94vw, 70svh, calc(100svh - 330px)); }
-  .pull { width: min(300px, 80vw); }
-  .pull-read b { font-size: 16px; }
-  .pull-line { font-size: 15px; }
-}
-.close.on { background: rgba(228, 228, 225, 0.86); }
-@media (max-width: 640px) {
-  .close { gap: 6px; }
-  .close-wheel { --d: min(94vw, 70svh, calc(100svh - 400px)); }
-  .pull svg { max-height: 24svh; }
-  .pull-msg { margin-top: 2px; }
 }
