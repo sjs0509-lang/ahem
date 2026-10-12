@@ -9,7 +9,7 @@
 | 파일 | 내용 |
 |---|---|
 | `data.js` | ★ 모든 문장과 세 지점 데이터. 보통 이것만 고치면 됩니다 |
-| `photos/` | 사진. 지점 화면 `node01.jpg`, `node02.jpg` / 지도 위 사진 프레임 `p01.jpg`~`p08.jpg` |
+| `photos/` | 지도 위 사진 프레임 사진 `p01.jpg`~`p08.jpg` |
 | `style.css` | 색과 글꼴. 색은 맨 위 `:root` |
 | `main.js` | 지도, 체감 곡선과 핸들, 비교 화면 |
 | `index.html` | 뼈대 |
@@ -26,7 +26,6 @@
 - `table` 비교 화면 표 문구 (`guide`, `problem`, `human`, `humanSub`). 줄 이름은 `TEXT.table`
 - `name`(지도·비교용 짧은 이름), `title`(지점 화면 위 이름), `space`(지도 화면 위 공간 한 줄)
 - `at` 지도 위 위치 (경로 한 바퀴를 0~1로 본 값), `scene` 지도에 더 그릴 공간 (fork / forest / road)
-- `photo` 사진 파일 이름. 파일이 없으면 회색 자리표시가 보입니다.
 - `TEXT` 도입 문장, 읽는 법, 정의, 주제 문장
 - `TEXT.hints` 처음 보는 사람용 동작 안내 문구 [마우스, 휴대폰]
 - `PHOTOS` 첫 지도 위 사진 프레임: `time`(시각), `place`(장소), `file`(파일 이름), `at`(찍은 곳), `size`(large / small), `kind`(photo / phone / none), `hidden`(화면에서만 숨김). 누르면 크게 열리고, 위로 밀면 시각·장소·작은 지도가 나옵니다.
@@ -42,4 +41,4 @@
 2. **Settings → Pages**에서 Source를 `Deploy from a branch`, `main` / `(root)`로 저장합니다.
 3. 1~2분 뒤 `https://<아이디>.github.io/<저장소이름>/`로 열립니다.
 
-사진 파일 이름은 대소문자를 구분합니다 (`node01.JPG` ≠ `node01.jpg`).
+사진 파일 이름은 대소문자를 구분합니다 (`p01.JPG` ≠ `p01.jpg`).

@@ -31,7 +31,6 @@
      table   비교 화면 표: guide 안내 / problem 무엇이 문제였나 / human 사람이 한 일 (+ humanSub 작은 글씨)
      actual  실제 시간(분) → 빨간 직선 길이
      felt    체감 시간(분) → 곡선 길이
-     photo   photos 폴더의 파일 이름. ""이면 photoNote를 씀
    ========================================================= */
 
 const TEXT = {
@@ -62,7 +61,6 @@ const TEXT = {
     align: ["노란 선을 끌어 분홍 선 위에 겹치세요", "노란 선을 손가락으로 끌어 분홍 선 위에 겹치세요"]
   },
   scrollDown: "아래로",
-  photoSlot: "사진 자리",
   est: "추정",
 
   // 비교 화면 표의 줄 이름
@@ -114,8 +112,7 @@ const POINTS = [
     },
     table: { guide: "없음", problem: "맞춰볼 안내가 없었다", human: "그렸다", humanSub: "새 길을 알려줌" },
     actual: { value: 8, estimated: false }, // 3:54 렌탈 → 4:02 입구 도착
-    felt: { value: 15, estimated: true },
-    photo: "node01.jpg"
+    felt: { value: 15, estimated: true }
   },
   {
     id: "02", name: "돌아갈 길", title: "돌아갈 길을 찾지 못함", at: 0.52, scene: "forest",
@@ -130,8 +127,7 @@ const POINTS = [
     },
     table: { guide: "휴대폰(GPT)", problem: "안내한 길이 공간에 없었다", human: "고쳤다", humanSub: "다른 길로 바로잡음" },
     actual: { value: 10, estimated: true },
-    felt: { value: 15, estimated: true },
-    photo: "node02.jpg"
+    felt: { value: 15, estimated: true }
   },
   {
     id: "03", name: "차도", at: 0.9, scene: "road",
@@ -145,8 +141,7 @@ const POINTS = [
     },
     table: { guide: "휴대폰(지도)", problem: "안내는 맞았지만 공간에서 확인할 수 없었다", human: "맞췄다", humanSub: "같은 길이 맞다고 보여줌" },
     actual: { value: 7, estimated: false },
-    felt: { value: 30, estimated: false },
-    photo: "", photoNote: "이 구간 사진 없음"
+    felt: { value: 30, estimated: false }
   }
 ];
 

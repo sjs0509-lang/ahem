@@ -1326,14 +1326,11 @@
   const scenes = [], felts = [], resolves = [];
   POINTS.forEach((p, i) => {
     const est = isEst(p.actual) || isEst(p.felt);
-    const photo = p.photo
-      ? `<figure class="polaroid"><div class="ph missing"><span>${esc(TEXT.photoSlot)}<br>${esc(p.photo)}</span></div></figure>`
-      : `<figure class="polaroid empty"><div class="ph"><span>${esc(p.photoNote || "")}</span></div></figure>`;
     const wrap = document.createElement("div");
     wrap.className = "point";
     wrap.innerHTML = `
       <section class="screen loc" id="p${esc(p.id)}-in"><div class="loc-head">${kicker(p)}<p class="loc-space">${esc(p.space)}</p>${p.note ? `<p class="loc-space">${esc(p.note)}</p>` : ""}</div>
-        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.space)}"></svg>${photo}</section>
+        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.space)}"></svg></section>
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
@@ -1348,15 +1345,6 @@
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
       </section>`;
     host.appendChild(wrap);
-
-    const img = wrap.querySelector(".ph.missing");
-    if (img) {
-      const im = new Image();
-      im.alt = "";
-      im.onload = () => img.classList.remove("missing");
-      im.src = "photos/" + p.photo;
-      img.appendChild(im);
-    }
 
     const prev = i ? scenePts(POINTS[i - 1]).depart : 0;
     scenes.push(inScene($(`#p${p.id}-in`, wrap), p, prev));
