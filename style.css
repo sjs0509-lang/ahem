@@ -197,11 +197,50 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .felt.done .down { opacity: 1; transition-delay: .6s; }
 .felt.playing .f-drag, .felt.done .f-drag { pointer-events: none; }
 .felt.playing .f-target, .felt.done .f-target { opacity: 0; transition: opacity .4s; }
-.felt.done .f-curve, .felt.done .f-left, .felt.done .f-drag { visibility: hidden; }
 .f-roll-tire { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
 .f-roll line { stroke: var(--ink); stroke-width: 1; }
 .f-lead line { stroke: var(--ink); stroke-width: 1; }
 .f-lead circle { fill: var(--ink); }
+
+/* ---------- 2. 해결: 펜툴 동작 ---------- */
+.r-panel { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: clamp(96px, 19svh, 160px); background: var(--bg); border-top: 1.5px solid var(--ink); }
+.r-felt-svg { display: block; width: 100%; height: 100%; }
+.r-curve { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
+.r-t { font-family: var(--ko); font-weight: 800; font-size: 13px; fill: var(--ink); }
+.r-real { fill: var(--red); }
+.r-tool { position: absolute; z-index: 4; top: 0; left: 0; margin: 0; pointer-events: none; padding: 3px 8px; border-radius: 3px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; opacity: 0; transition: opacity .2s; }
+.r-tool.on { opacity: 1; }
+.resolve.done .r-tool { opacity: 0; }
+.r-skip { position: absolute; z-index: 3; right: var(--pad); bottom: calc(clamp(96px, 19svh, 160px) + 12px); border: 0; background: none; padding: 4px 2px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); text-decoration: underline; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .4s; }
+.resolve.can-skip:not(.done) .r-skip { opacity: 1; pointer-events: auto; }
+.resolve .down { z-index: 3; bottom: 8px; }
+.resolve.done .down { opacity: 1; transition-delay: 2.4s; }
+.r-card { width: min(300px, calc(100% - 24px)); }
+.r-card::after { content: ""; position: absolute; left: var(--lx, 24px); top: 100%; width: 1px; height: var(--lh, 14px); background: var(--ink); }
+.r-blink circle { fill: none; stroke-width: 3; animation: r-blink 1s ease-in-out infinite; }
+@keyframes r-blink { 50% { opacity: .2; } }
+.r-blink.off, .r-blink.hit circle { display: none; }
+.resolve.done .r-blink { display: none; }
+.r-end rect { fill: #fff; stroke: var(--ink); stroke-width: 2; }
+.r-new-anchor rect { stroke: var(--ink); stroke-width: 1.5; }
+.r-pink-line { fill: none; stroke-width: 5; stroke-dasharray: 2 11; stroke-linecap: round; vector-effect: non-scaling-stroke; transition: opacity .4s; }
+.r-anchor { cursor: grab; touch-action: none; transition: opacity .4s; }
+.r-anchor rect { stroke: var(--ink); stroke-width: 1.5; }
+.r-pink-line.gone, .r-anchor.gone { opacity: 0; pointer-events: none; }
+.resolve.dragging .r-anchor, .resolve.dragging .r-yel { cursor: grabbing; }
+.r-yel { cursor: grab; touch-action: none; }
+.r-yel path { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.r-yel-halo { stroke: #fff; stroke-width: 9; }
+.r-yel-line { stroke-width: 5; }
+.r-yel-hit { stroke: transparent; stroke-width: 34; pointer-events: stroke; }
+.r-smart { fill: none; stroke: #13b26b; stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: 0; }
+.r-smart-tag { opacity: 0; }
+.r-smart-tag rect { fill: #13b26b; }
+.r-smart-tag text { font-family: var(--ko); font-weight: 800; font-size: 12px; fill: #fff; }
+.resolve.aligned .r-smart, .resolve.aligned .r-smart-tag { animation: r-flash 1.2s ease-out forwards; }
+@keyframes r-flash { 0% { opacity: 0; } 15% { opacity: 1; } 30% { opacity: .35; } 45% { opacity: 1; } 100% { opacity: .9; } }
+.cmp-grid .td .verb { display: block; font-size: 1.15em; }
+.cmp-grid .td small { display: block; font-size: 0.85em; font-weight: 600; color: var(--ink-3); }
 
 /* 끝점 옆 주석 카드 */
 .f-card {
@@ -269,5 +308,6 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .legend-list li, .down, .f-card { transition: none; }
   .pf.pop .pf-in { animation: none; }
+  .r-blink circle, .resolve.aligned .r-smart, .resolve.aligned .r-smart-tag { animation: none; opacity: 1; }
   .f-card.on { animation: none; opacity: 1; transform: none; }
 }

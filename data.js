@@ -25,8 +25,10 @@
                label: 화살표 끝의 짧은 말 ("" 이면 라벨 없음)
                along: 실제 길을 따라 겹치는 길이
                text:  카드의 "무엇이" / line: 카드의 한 줄 문장
+               action: 해결 화면의 펜툴 동작 "add" 점 추가 / "move" 점 옮기기 / "align" 정렬
+               tool:   그 동작 중 커서 옆에 뜨는 툴 이름
 
-     table   비교 화면 표: guide 안내 / problem 무엇이 문제였나 / human 사람이 한 일
+     table   비교 화면 표: guide 안내 / problem 무엇이 문제였나 / human 사람이 한 일 (+ humanSub 작은 글씨)
      actual  실제 시간(분) → 빨간 직선 길이
      felt    체감 시간(분) → 곡선 길이
      photo   photos 폴더의 파일 이름. ""이면 photoNote를 씀
@@ -50,6 +52,8 @@ const TEXT = {
   },
 
   matched: "그날 느낀 시간",
+  // 해결 화면
+  resolve: { skip: "건너뛰기", aligned: "정렬됨" },
   scrollDown: "아래로",
   photoSlot: "사진 자리",
   est: "추정",
@@ -97,10 +101,11 @@ const POINTS = [
     guide: { source: null },
     fix: {
       source: "person", who: "woman", label: "저쪽이 입구예요", along: 0.06,
+      action: "add", tool: "펜 툴: 점 추가",
       text: "폴란드 여성이 입구까지 같이 가줌",
-      line: "맞춰볼 안내가 없었다. 사람이 새 안내를 주자, 눈앞의 길과 맞아떨어졌다."
+      line: "안내가 없었다. 여성이 입구까지 같이 가며 새 길을 그려줬다."
     },
-    table: { guide: "없음", problem: "맞춰볼 안내가 없었다", human: "새 안내를 줬다" },
+    table: { guide: "없음", problem: "맞춰볼 안내가 없었다", human: "그렸다", humanSub: "새 길을 알려줌" },
     actual: { value: 8, estimated: false }, // 3:54 렌탈 → 4:02 입구 도착
     felt: { value: 15, estimated: true },
     photo: "node01.jpg"
@@ -112,10 +117,11 @@ const POINTS = [
     guide: { source: "phone", label: "이 길로 가세요", to: [578, 400], dashed: true },
     fix: {
       source: "person", who: "couple", label: "이쪽이에요", along: 0.08,
+      action: "move", tool: "직접 선택 툴: 점 옮기기",
       text: "커플의 설명",
-      line: "휴대폰이 말한 길은 눈앞에 없었다. 사람이 다른 길을 알려줬다."
+      line: "휴대폰이 말한 길은 눈앞에 없었다. 커플이 길을 고쳐줬다."
     },
-    table: { guide: "휴대폰(GPT)", problem: "안내한 길이 공간에 없었다", human: "다른 길을 알려줬다" },
+    table: { guide: "휴대폰(GPT)", problem: "안내한 길이 공간에 없었다", human: "고쳤다", humanSub: "다른 길로 바로잡음" },
     actual: { value: 10, estimated: true },
     felt: { value: 15, estimated: true },
     photo: "node02.jpg"
@@ -126,10 +132,11 @@ const POINTS = [
     guide: { source: "phone", label: "직진하세요", along: 0.06 },
     fix: {
       source: "person", who: "cyclist", label: "", along: 0.06,
+      action: "align", tool: "스마트 가이드: 정렬",
       text: "자전거 탄 아저씨",
-      line: "길은 그대로였다. 같은 길을 가는 자전거 한 대가 보이자, 지도를 믿을 수 있었다."
+      line: "길은 그대로였다. 같은 길을 가는 자전거 한 대가, 지도가 맞다고 보여줬다."
     },
-    table: { guide: "휴대폰(지도)", problem: "안내는 맞았지만 공간에서 확인할 수 없었다", human: "같은 길이 맞다고 보여줬다" },
+    table: { guide: "휴대폰(지도)", problem: "안내는 맞았지만 공간에서 확인할 수 없었다", human: "맞췄다", humanSub: "같은 길이 맞다고 보여줌" },
     actual: { value: 7, estimated: false },
     felt: { value: 30, estimated: false },
     photo: "", photoNote: "이 구간 사진 없음"

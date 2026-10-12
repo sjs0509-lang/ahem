@@ -189,10 +189,18 @@
 
   /* ---------- 지도 하나 만들기 ----------
      지형은 확대하면 같이 커지고, 경로 선·번호·글자·자전거·화살표 머리는 화면에서 늘 같은 크기 */
-  function buildMap(svg, focus) {
+  function buildMap(svg, focus, opt = {}) {
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     drawTerrain(svg);
-    const route = "M" + SAMPLES.map(pt).join(" L");
+    let known = SAMPLES;
+    if (opt.cut != null) {
+      // 아직 이어지지 않은 길: 공간에 있는 길(모래색)만 보이고, 잉크 선은 끝점에서 끊김
+      known = SAMPLES.filter((_, i) => CUM[i] <= opt.cut).concat([P(opt.cut)]);
+      const rest = "M" + [P(opt.cut)].concat(SAMPLES.filter((_, i) => CUM[i] > opt.cut)).map(pt).join(" L");
+      el("path", { d: rest, fill: "none", stroke: "var(--ink)", "stroke-width": 7, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
+      el("path", { d: rest, fill: "none", stroke: "var(--sand)", "stroke-width": 4.6, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
+    }
+    const route = "M" + known.map(pt).join(" L");
     el("path", { d: route, fill: "none", stroke: "#fff", "stroke-width": 7, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
     el("path", { d: route, fill: "none", stroke: "var(--ink)", "stroke-width": 3, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
     const arrowLayer = el("g", {}, svg);
@@ -246,7 +254,9 @@
 
     const hooks = { box: [], bike: [] };
     const map = {
-      svg,
+      svg, arrowLayer,
+      pin, place,
+      k: () => k,
       on(type, fn) { hooks[type].push(fn); },
       setBox(b) {
         box = b;
@@ -331,7 +341,8 @@
         else flipC = bikeGlyph(f.g);
         return {
           show(o) { f.g.setAttribute("opacity", o.toFixed(2)); },
-          at(s2) { if (s2 == null || !flipC) return; f.p = P(s2); faceAt(flipC, s2); place(f); }
+          at(s2) { if (s2 == null || !flipC) return; f.p = P(s2); faceAt(flipC, s2); place(f); },
+          moveTo(q2) { f.p = q2; place(f); }
         };
       }
     };
@@ -422,7 +433,7 @@
   const ROLL_MAX_MS = 6000;
 
   function feltView(svg, p) {
-    const sec = svg.closest(".felt"), card = $(".f-card", sec);
+    const sec = svg.closest(".felt");
     const src = p.guide && p.guide.source, hc = COLOR[src] || NO_GUIDE;
     const r = ratioOf(p), felt = val(p.felt) || 0;
     let W, H, M, ghost, ghostKnob, knobTop, pitch, base, n, refs, anim, roll;
@@ -467,13 +478,12 @@
         <text class="f-t f-felt-t" text-anchor="middle"><tspan class="f-day"></tspan><tspan class="f-min"></tspan></text>
         <g class="f-roll" visibility="hidden"><g class="f-roll-w">
           <circle class="f-roll-tire" r="${f1(rw)}"/>${[0, 45, 90, 135].map((d) => `<line x1="${f1(-rw)}" y1="0" x2="${f1(rw)}" y2="0" transform="rotate(${d})"/>`).join("")}
-        </g></g>
-        <g class="f-lead" visibility="hidden"><line/><circle r="4"/></g>`;
+        </g></g>`;
       refs = {
         curve: $(".f-curve", svg), drag: $(".f-drag", svg), dragLine: $(".f-drag line", svg), dragKnobs: svg.querySelectorAll(".f-drag circle"),
         leftLine: $(".f-left line", svg), leftKnob: $(".f-left circle", svg),
         text: $(".f-felt-t", svg), day: $(".f-day", svg), min: $(".f-min", svg),
-        roll: $(".f-roll", svg), rollW: $(".f-roll-w", svg), lead: $(".f-lead", svg), rw
+        roll: $(".f-roll", svg), rollW: $(".f-roll-w", svg), rw
       };
       refs.drag.addEventListener("pointerdown", start);
       refs.drag.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
@@ -564,21 +574,18 @@
       return { p: [lerp(a[0], b[0], t), lerp(a[1], b[1], t)], dir: norm([b[0] - a[0], b[1] - a[1]]), dist: L * clamp(f) };
     }
 
-    // ③④ 굴러가며 펴짐. f = 0..1 진행
-    const FLAT_FROM = 0.55;
+    // ③ 늘어난 곡선을 따라 굴러감. f = 0..1 진행 (펴짐은 해결 화면에서)
     let travelled = 0, lastAt = null;
     function frame(f) {
-      const g = ease(clamp((f - FLAT_FROM) / (1 - FLAT_FROM)));
       const shown = ghost.n > 0 ? ghostKnob : ghost.knob;
-      const kb = [lerp(ghost.knob[0], M.B[0], g), lerp(ghost.knob[1], M.B[1], g)];
-      const s = M.shape(kb, ghost.n * (1 - g), 1 - g, (1 - g) * (1 - g));
-      drawShape(s, [lerp(shown[0], M.B[0], g), lerp(shown[1], M.B[1], g)], 1 - g);
+      const s = M.shape(ghost.knob, ghost.n);
+      drawShape(s, shown, 1);
       label(s, felt * f, true);
       // 작은 바퀴: 곡선 위를 굴러감 + 살짝 덜컹
       const at = along(s.pts, f), up = [at.dir[1], -at.dir[0]];
       if (lastAt) travelled += Math.hypot(at.p[0] - lastAt[0], at.p[1] - lastAt[1]);
       lastAt = at.p;
-      const bump = Math.abs(Math.sin(travelled / 11)) * 2.2 * (1 - g);
+      const bump = f < 1 ? Math.abs(Math.sin(travelled / 11)) * 2.2 : 0;
       const c = add(at.p, up, refs.rw + 1.5 + bump);
       refs.roll.setAttribute("visibility", "visible");
       refs.roll.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])})`);
@@ -603,31 +610,12 @@
       roll = requestAnimationFrame(step);
     }
 
-    // ⑤ 완전히 펴진 순간: 도착 앵커 옆 주석 카드
+    // 끝까지 굴러감: 바퀴는 도착 앵커에 멈춰 있고, 아래로 안내
     function finish() {
       state = "done";
       frame(1);
-      refs.roll.setAttribute("visibility", "hidden");
       sec.classList.remove("playing");
       sec.classList.add("done");
-      placeCard();
-    }
-
-    function placeCard() {
-      const B = M.B, right = W - B[0] > 340;
-      const cw = Math.min(300, W - 32);
-      card.style.width = cw + "px";
-      card.classList.add("on");
-      // 카드 아래 변을 기준으로 놓는다 (글 길이가 달라도 지시선이 카드에 닿게)
-      let x, y, lx;
-      if (right) { x = B[0] + 48; y = B[1] - 56; lx = x; }
-      else { x = Math.max(16, W - 16 - cw); y = B[1] - 130; lx = clamp(B[0], x + 12, x + cw - 12); }
-      card.style.left = f1(x) + "px"; card.style.bottom = f1(H - y) + "px";
-      const ln = $("line", refs.lead), dot = $("circle", refs.lead);
-      dot.setAttribute("cx", f1(B[0])); dot.setAttribute("cy", f1(B[1]));
-      ln.setAttribute("x1", f1(B[0])); ln.setAttribute("y1", f1(B[1]));
-      ln.setAttribute("x2", f1(lx)); ln.setAttribute("y2", f1(y));
-      refs.lead.setAttribute("visibility", "visible");
     }
 
     function render() {
@@ -907,33 +895,313 @@
     };
   }
 
-  function outScene(sec, p) {
-    const map = buildMap($(".map", sec), p), sp = scenePts(p), s = p.at * LOOP;
-    frameSets.push(photoFrames(map));
-    const g = p.guide || {};
-    // 그때의 안내는 그대로 남아 있고, 노랑 화살표가 실제 길 위에 겹친다
-    const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label, wide: !g.to }) : null;
-    if (guide) guide.set(1);
-    const fix = map.arrow(sp.fix, COLOR[p.fix.source] || NO_GUIDE, { label: p.fix.label, thin: !!(guide && !g.to) });
-    const who = map.person(p.fix.who, s);
-    const moving = p.fix.who === "cyclist";
-    return {
-      sec, DUR: 3800,
-      apply(t) {
-        map.setBox(sceneBox(map, p, sp));
-        const fp = clamp((t - 700) / (moving ? 1300 : 900));
-        who.show(clamp((t - 200) / 400));
-        // 앞서 가는 자전거: 그 움직임이 곧 노랑 화살표
-        who.at(moving ? lerp(s + LOOP * 0.012, sp.depart, fp) : null);
-        fix.set(fp);
-        map.setBike(lerp(s, sp.depart - (moving ? LOOP * 0.012 : 0), ease(clamp((t - 2000) / 1600))));
-      }
-    };
+  /* =========================================================
+     해결 화면: 길을 다시 찾은 방법 = 펜툴의 세 동작
+       add   펜 툴: 점 추가      — 끊긴 길 끝에서 새 앵커를 찍어 노랑 선을 그림
+       move  직접 선택 툴: 점 옮기기 — 숲속 분홍 앵커를 실제 길 위 자리로 끌어 옮김
+       align 스마트 가이드: 정렬   — 비켜 있던 노랑 경로를 분홍 경로 위에 겹침
+     끝나면: 아래 체감 곡선이 펴지고 → 카드 → 선이 다음 길로 이어지고 자전거가 출발
+     ========================================================= */
+  const RS = TEXT.resolve;
+
+  // 아래쪽 작은 체감 곡선 (체감 화면에서 늘어난 그대로 → 해결되면 펴짐)
+  function miniFelt(svg, p) {
+    const r = ratioOf(p);
+    let M, gh, W, H;
+    function layout() {
+      W = svg.clientWidth; H = svg.clientHeight;
+      const k = Math.min(W * 0.62, 520) / MAX_ACTUAL, G = H - 28;
+      const A = [18, G], B = [18 + k * (val(p.actual) || 1), G];
+      const rho = clamp(H * 0.06, 5, 10);
+      M = feltModel(A, B, { topLimit: 10 + 2 * rho, knobTop: -Infinity, band: 0, rho });
+      gh = M.ghost(r);
+      svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
+      svg.innerHTML = `<line class="f-ground" x1="0" y1="${f1(G)}" x2="${f1(W)}" y2="${f1(G)}"/>
+        <line class="f-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
+        <path class="r-curve"/>
+        ${[A, B].map((q) => `<rect class="f-anchor" x="${f1(q[0] - 5)}" y="${f1(q[1] - 5)}" width="10" height="10"/>`).join("")}
+        <text class="r-t r-real" x="${f1((A[0] + B[0]) / 2)}" y="${f1(G + 19)}" text-anchor="middle">실제 ${val(p.actual)}분</text>
+        <text class="r-t r-felt" x="${f1(B[0] + 12)}" y="${f1(G - 12)}">체감 ${val(p.felt)}분</text>`;
+    }
+    function set(g) {
+      const kb = [lerp(gh.knob[0], M.B[0], g), lerp(gh.knob[1], M.B[1], g)];
+      $(".r-curve", svg).setAttribute("d", polyD(M.shape(kb, gh.n * (1 - g), 1 - g, (1 - g) * (1 - g)).pts));
+      $(".r-felt", svg).setAttribute("opacity", f1(1 - g));
+      $(".r-curve", svg).setAttribute("opacity", g >= 1 ? 0 : 1); // 다 펴지면 빨간 직선만
+    }
+    return { layout, set, endX: () => M.B[0], endY: () => M.B[1] };
   }
+
+  // 화면 좌표 → 지도 좌표
+  function toMap(svg, e) {
+    const m = svg.getScreenCTM();
+    if (!m) return [0, 0];
+    const q = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+    return [q.x, q.y];
+  }
+  const pxDist = (map, a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) / map.k();
+  function distToPolyline(q, pts) {
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1;
+      const t = clamp(((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2);
+      best = Math.min(best, Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dy * t));
+    }
+    return best;
+  }
+
+  function resolveScene(sec, p) {
+    const s = p.at * LOOP, sp = scenePts(p), g = p.guide || {}, act = p.fix.action;
+    const map = buildMap($(".map", sec), p, { cut: s });
+    frameSets.push(photoFrames(map));
+    const svg = map.svg, YEL = COLOR[p.fix.source] || NO_GUIDE;
+    const tip = sp.fix[sp.fix.length - 1];
+    const mini = miniFelt($(".r-felt-svg", sec), p);
+    const card = $(".r-card", sec), tool = $(".r-tool", sec), skip = $(".r-skip", sec);
+    let state = "idle", raf = 0;
+
+    // 사람 (01 여성 · 02 커플은 지점 옆, 03 아저씨는 노랑 경로 끝)
+    const who = map.person(p.fix.who, s);
+    who.show(1);
+
+    // 노랑으로 깜빡이는 빈 원 = 사람이 알려준 자리
+    const blink = map.pin(tip, "r-blink" + (act === "align" ? " off" : ""));
+    el("circle", { r: 15, stroke: YEL }, blink.g);
+    if (p.fix.label) {
+      el("rect", { x: 20, y: -14, width: p.fix.label.length * 13 + 20, height: 28, rx: 14, class: "m-say-bg", stroke: YEL }, blink.g);
+      const t = el("text", { x: 30 + (p.fix.label.length * 13) / 2, y: 5, "text-anchor": "middle", class: "m-say-t" }, blink.g);
+      t.textContent = p.fix.label;
+    }
+
+    // 다시 이어진 길 (노랑)
+    const fixArrow = map.arrow(sp.fix, YEL, { thin: act === "align" });
+    fixArrow.set(0);
+
+    // 동작별 준비
+    let pinkAnchor = null, pinkLine = null, anchorPos = null, yel = null, off = [0, 0], guideArrow = null, smart = null;
+    if (act === "add") {
+      // 길이 끝점에서 끊겨 있음: 끝점 표시
+      const end = map.pin(P(s), "r-end");
+      el("rect", { x: -6, y: -6, width: 12, height: 12 }, end.g);
+    }
+    if (act === "move") {
+      const from = P(s + LOOP * 0.004);
+      pinkLine = el("path", { class: "r-pink-line", stroke: COLOR[g.source] }, map.arrowLayer);
+      pinkAnchor = map.pin(g.to, "r-anchor");
+      el("rect", { x: -9, y: -9, width: 18, height: 18, fill: COLOR[g.source] }, pinkAnchor.g);
+      el("circle", { r: 26, class: "f-hit" }, pinkAnchor.g);
+      anchorPos = g.to.slice();
+      pinkAnchor.from = from;
+    }
+    if (act === "align") {
+      guideArrow = map.arrow(sp.guide, COLOR[g.source], { wide: true, label: g.label });
+      guideArrow.set(1);
+      // 비켜 있는 노랑 경로 (끌 수 있음)
+      yel = el("g", { class: "r-yel" }, map.arrowLayer);
+      el("path", { d: polyD(sp.fix), class: "r-yel-halo" }, yel);
+      el("path", { d: polyD(sp.fix), class: "r-yel-line", stroke: YEL }, yel);
+      el("path", { d: polyD(sp.fix), class: "r-yel-hit" }, yel);
+      // 스마트 가이드: 분홍 경로를 양쪽으로 늘인 얇은 선 + "정렬됨"
+      const a = sp.guide[0], b = sp.guide[sp.guide.length - 1], d0 = norm([sp.guide[1][0] - a[0], sp.guide[1][1] - a[1]]);
+      const n = sp.guide.length, d1 = norm([b[0] - sp.guide[n - 2][0], b[1] - sp.guide[n - 2][1]]);
+      smart = { line: el("path", { class: "r-smart" }, map.arrowLayer), tag: map.pin(sp.guide[Math.floor(n / 2)], "r-smart-tag"), a, b, d0, d1 };
+      el("rect", { x: -34, y: -40, width: 68, height: 22, rx: 3 }, smart.tag.g);
+      el("text", { x: 0, y: -24, "text-anchor": "middle" }, smart.tag.g).textContent = RS.aligned;
+    }
+
+    // 지금 상태 그리기 (화면 크기가 바뀌어도 다시 그릴 수 있게)
+    function draw() {
+      const k = map.k();
+      if (act === "move") {
+        const pts = [pinkAnchor.from, anchorPos];
+        pinkLine.setAttribute("d", polyD(pts));
+        pinkAnchor.p = anchorPos; map.place(pinkAnchor);
+      }
+      if (act === "align") {
+        yel.setAttribute("transform", `translate(${f1(off[0])} ${f1(off[1])})`);
+        who.moveTo(add(tip, off));
+        const { a, b, d0, d1 } = smart, ext = 60 * k;
+        smart.line.setAttribute("d", `M${pt(add(a, d0, -ext))} L${polyD(sp.guide).slice(1)} L${pt(add(b, d1, ext))}`);
+      }
+    }
+
+    function layout() {
+      mini.layout();
+      mini.set(state === "done" ? 1 : 0);
+      map.setBox(sceneBox(map, p, sp));
+      if (act === "align" && state === "idle") {
+        // 처음에는 아저씨 경로가 분홍 옆으로 살짝 비켜 있음
+        const a = sp.guide[0], b = sp.guide[sp.guide.length - 1], d = norm([b[0] - a[0], b[1] - a[1]]);
+        const nv = [d[1], -d[0]];
+        off = [nv[0] * 26 * map.k(), nv[1] * 26 * map.k()];
+      }
+      draw();
+      if (state === "done") { fixArrow.set(1); map.setBike(sp.depart - (act === "align" ? LOOP * 0.012 : 0)); placeCard(); }
+      else map.setBike(s);
+    }
+
+    /* ---------- 끝났을 때 ---------- */
+    function placeCard() {
+      card.classList.add("on");
+      const panel = $(".r-panel", sec), x = clamp(mini.endX() - 24, 12, sec.clientWidth - card.offsetWidth - 12);
+      card.style.left = f1(x) + "px";
+      card.style.bottom = f1(panel.offsetHeight + 14) + "px";
+      card.style.setProperty("--lx", f1(mini.endX() - x) + "px");
+      card.style.setProperty("--lh", f1(14 + mini.endY() - 6) + "px"); // 지시선이 도착 앵커까지
+      card.classList.add("on");
+    }
+    function complete() {
+      if (state === "done") return;
+      state = "done";
+      sec.classList.add("done");
+      unlock(sec);
+      const t0 = performance.now(), D = RM.matches ? 1 : 1200;
+      const step = (now) => {
+        const t = clamp((now - t0) / D);
+        mini.set(ease(t));
+        if (t < 1) raf = requestAnimationFrame(step);
+        else { placeCard(); depart(); }
+      };
+      raf = requestAnimationFrame(step);
+    }
+    // 선이 다음 길로 이어지고 자전거가 다시 출발
+    function depart() {
+      const t0 = performance.now(), D = RM.matches ? 1 : 1800;
+      const step = (now) => {
+        const t = clamp((now - t0) / D);
+        if (act !== "align") fixArrow.set(clamp(t / 0.5));
+        map.setBike(lerp(s, sp.depart - (act === "align" ? LOOP * 0.012 : 0), ease(clamp((t - 0.2) / 0.8))));
+        if (t < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    }
+    // 노랑 선 그리기 (점 추가 · 점 옮기기)
+    function drawYellow(then) {
+      const t0 = performance.now(), D = RM.matches ? 1 : 900;
+      const step = (now) => {
+        const t = clamp((now - t0) / D);
+        fixArrow.set(t);
+        if (t < 1) raf = requestAnimationFrame(step); else then();
+      };
+      raf = requestAnimationFrame(step);
+    }
+
+    /* ---------- 동작 ---------- */
+    function snapAdd() {
+      blink.g.classList.add("hit");
+      const a = map.pin(tip, "r-new-anchor");
+      el("rect", { x: -7, y: -7, width: 14, height: 14, fill: YEL }, a.g);
+      map.place(a);
+      drawYellow(complete);
+    }
+    function snapMove() {
+      anchorPos = tip.slice(); draw();
+      pinkLine.classList.add("gone"); pinkAnchor.g.classList.add("gone");
+      blink.g.classList.add("hit");
+      drawYellow(complete);
+    }
+    function snapAlign() {
+      off = [0, 0]; draw();
+      sec.classList.add("aligned");
+      fixArrow.set(1);
+      complete();
+    }
+    const SNAP = { add: snapAdd, move: snapMove, align: snapAlign };
+
+    // 커서 옆 툴 이름
+    function showTool(e) {
+      if (state !== "idle") return;
+      const b = sec.getBoundingClientRect();
+      tool.style.transform = `translate(${f1(e.clientX - b.left + 16)}px, ${f1(e.clientY - b.top + 14)}px)`;
+      tool.classList.add("on");
+    }
+    svg.addEventListener("pointermove", showTool);
+    svg.addEventListener("pointerleave", () => tool.classList.remove("on"));
+
+    svg.addEventListener("pointerdown", (e) => {
+      if (state !== "idle") return;
+      showTool(e);
+      const q = toMap(svg, e);
+      if (act === "add") {
+        if (pxDist(map, q, tip) < 40) { e.preventDefault(); state = "busy"; snapAdd(); }
+        return;
+      }
+      let grab = null;
+      if (act === "move" && pxDist(map, q, anchorPos) < 34) grab = { from: anchorPos.slice(), q };
+      if (act === "align" && distToPolyline([q[0] - off[0], q[1] - off[1]], sp.fix) / map.k() < 26) grab = { from: off.slice(), q };
+      if (!grab) return;
+      e.preventDefault();
+      try { svg.setPointerCapture(e.pointerId); } catch (err) { /* 캡처가 안 돼도 계속 */ }
+      sec.classList.add("dragging");
+      const move = (ev) => {
+        showTool(ev);
+        const q2 = toMap(svg, ev), d = [q2[0] - grab.q[0], q2[1] - grab.q[1]];
+        if (act === "move") {
+          anchorPos = [grab.from[0] + d[0], grab.from[1] + d[1]];
+          draw();
+          if (pxDist(map, anchorPos, tip) < 30) { stop(); state = "busy"; snapMove(); }
+        } else {
+          off = [grab.from[0] + d[0], grab.from[1] + d[1]];
+          draw();
+          if (Math.hypot(off[0], off[1]) / map.k() < 7) { stop(); state = "busy"; snapAlign(); }
+        }
+      };
+      const stop = () => {
+        svg.removeEventListener("pointermove", move);
+        svg.removeEventListener("pointerup", stop);
+        svg.removeEventListener("pointercancel", stop);
+        sec.classList.remove("dragging");
+      };
+      svg.addEventListener("pointermove", move);
+      svg.addEventListener("pointerup", stop);
+      svg.addEventListener("pointercancel", stop);
+    });
+
+    // 건너뛰기: 동작을 대신 해 준다
+    skip.addEventListener("click", () => {
+      if (state !== "idle") return;
+      state = "busy";
+      if (act === "add") { snapAdd(); return; }
+      const t0 = performance.now(), D = RM.matches ? 1 : 700, f0 = act === "move" ? anchorPos.slice() : off.slice();
+      const step = (now) => {
+        const t = ease(clamp((now - t0) / D));
+        if (act === "move") anchorPos = [lerp(f0[0], tip[0], t), lerp(f0[1], tip[1], t)];
+        else off = [lerp(f0[0], 0, t), lerp(f0[1], 0, t)];
+        draw();
+        if (t < 1) raf = requestAnimationFrame(step); else SNAP[act]();
+      };
+      raf = requestAnimationFrame(step);
+    });
+
+    return { sec, layout, isDone: () => state !== "idle" };
+  }
+
+  /* ---------- 동작 전에는 다음 화면으로 넘어가지 않게 잠깐 고정 ----------
+     위로는 자유롭게. 5초 뒤 "건너뛰기"가 나온다 */
+  let lockSec = null, lockTimer = 0;
+  const lockTop = () => lockSec.getBoundingClientRect().top + window.scrollY;
+  function lock(sec) {
+    if (lockSec === sec) return;
+    lockSec = sec;
+    clearTimeout(lockTimer);
+    lockTimer = setTimeout(() => sec.classList.add("can-skip"), 5000);
+  }
+  function unlock(sec) { if (lockSec === sec) { lockSec = null; clearTimeout(lockTimer); } }
+  const pastLock = () => lockSec && window.scrollY >= lockTop() - 2;
+  window.addEventListener("wheel", (e) => { if (e.deltaY > 0 && pastLock()) e.preventDefault(); }, { passive: false });
+  let touchY = null;
+  window.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener("touchmove", (e) => {
+    if (touchY != null && e.touches[0].clientY < touchY && pastLock() && !e.target.closest(".r-yel, .r-anchor")) e.preventDefault();
+  }, { passive: false });
+  window.addEventListener("keydown", (e) => {
+    if (["ArrowDown", "PageDown", "End", " "].includes(e.key) && pastLock() && !e.target.closest("button, input, textarea")) e.preventDefault();
+  });
+  window.addEventListener("scroll", () => { if (lockSec && window.scrollY > lockTop() + 2) window.scrollTo(0, lockTop()); }, { passive: true });
 
   // 2. 지점마다 같은 순서: 지도(안내) → 체감 → 지도(다시 이어짐)
   const host = $("#points");
-  const scenes = [], felts = [];
+  const scenes = [], felts = [], resolves = [];
   POINTS.forEach((p, i) => {
     const est = isEst(p.actual) || isEst(p.felt);
     const photo = p.photo
@@ -946,12 +1214,17 @@
         <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.space)}"></svg>${photo}</section>
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
-        <div class="f-card"><p class="f-card-who">${lineGlyph(p.fix.source)}<span style="--c:${COLOR[p.fix.source] || NO_GUIDE}">${esc(p.fix.text)}</span></p>
-          <p class="f-card-line">${esc(p.fix.line || "")}</p></div>
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
       </section>
-      <section class="screen loc" id="p${esc(p.id)}-out"><div class="loc-head">${kicker(p)}</div>
-        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.fix.text)}"></svg></section>`;
+      <section class="screen loc resolve act-${esc(p.fix.action)}" id="p${esc(p.id)}-out"><div class="loc-head">${kicker(p)}</div>
+        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.fix.tool + " — " + p.fix.text)}"></svg>
+        <p class="r-tool">${esc(p.fix.tool)}</p>
+        <div class="r-panel"><svg class="r-felt-svg" aria-hidden="true"></svg></div>
+        <div class="f-card r-card"><p class="f-card-who">${lineGlyph(p.fix.source)}<span style="--c:${COLOR[p.fix.source] || NO_GUIDE}">${esc(p.fix.text)}</span></p>
+          <p class="f-card-line">${esc(p.fix.line || "")}</p></div>
+        <button class="r-skip" type="button">${esc(TEXT.resolve.skip)}</button>
+        <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
+      </section>`;
     host.appendChild(wrap);
 
     const img = wrap.querySelector(".ph.missing");
@@ -966,7 +1239,7 @@
     const prev = i ? scenePts(POINTS[i - 1]).depart : 0;
     scenes.push(inScene($(`#p${p.id}-in`, wrap), p, prev));
     felts.push(feltView($(".felt-svg", wrap), p));
-    scenes.push(outScene($(`#p${p.id}-out`, wrap), p));
+    resolves.push(resolveScene($(`#p${p.id}-out`, wrap), p));
   });
 
   // 3-① 비교: 같은 기준선, 같은 축척 + 아래 표
@@ -981,7 +1254,7 @@
       ${row("guide", (p) => `${miniScene(p, "guide")}<span>${esc(p.table.guide)}</span>`)}
       ${row("problem", (p) => `<span>${esc(p.table.problem)}</span>`)}
       ${row("time", (p) => `<span><b class="r">${val(p.actual)}</b> → <b>${val(p.felt)}분</b></span>`)}
-      ${row("human", (p) => `${miniScene(p, "human")}<span>${esc(p.table.human)}</span>`)}
+      ${row("human", (p) => `${miniScene(p, "human")}<span><b class="verb">${esc(p.table.human)}</b><small>${esc(p.table.humanSub || "")}</small></span>`)}
       <div class="tr"><p class="th">${esc(TB.photos)}</p><div class="td td-all">${esc(TB.photosAll)}</div></div>
     </div>`;
 
@@ -1046,6 +1319,7 @@
     frameSets.forEach((f) => f.layout());
     scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
     felts.forEach((f) => f.render());
+    resolves.forEach((r) => r.layout());
     drawCompare();
   }
   layoutAll();
@@ -1111,6 +1385,12 @@
 
   if ("IntersectionObserver" in window) {
     const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+      const rv = resolves.find((x) => x.sec === en.target);
+      if (rv) {
+        if (en.intersectionRatio >= 0.55 && !rv.isDone()) lock(rv.sec);
+        else if (!en.isIntersecting) unlock(rv.sec);
+        return;
+      }
       const sc = scenes.find((x) => x.sec === en.target);
       if (sc) {
         if (en.intersectionRatio >= 0.55) scenePlay(sc);
@@ -1118,6 +1398,7 @@
       } else if (en.isIntersecting) en.target.classList.add("in");
     }), { threshold: [0, 0.3, 0.55] });
     scenes.forEach((sc) => io.observe(sc.sec));
+    resolves.forEach((r) => io.observe(r.sec));
     io.observe($("#legend"));
   } else {
     scenes.forEach(sceneEnd);
