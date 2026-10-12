@@ -14,6 +14,8 @@
   --yellow: #f2c014;
   --pink: #e83fb4;
   --pink-soft: #fbd3ec;
+  /* 스마트 가이드(정렬 안내선) 초록 — 분홍(휴대폰)과 헷갈리지 않게 */
+  --guide: #13b26b;
 
   /* 지형 (파스텔 + 쨍한 색 조금) */
   --sea: #c9e2f2;
@@ -325,12 +327,15 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .r-yel-halo { stroke: #fff; stroke-width: 9; }
 .r-yel-line { stroke-width: 5; }
 .r-yel-hit { stroke: transparent; stroke-width: 34; pointer-events: stroke; }
-.r-smart { fill: none; stroke: #13b26b; stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: 0; }
+.r-smart { fill: none; stroke: var(--guide); stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: 0; transition: opacity .15s; }
 .r-smart-tag { opacity: 0; }
-.r-smart-tag rect { fill: #13b26b; }
+.r-smart-tag rect { fill: var(--guide); }
+/* 가까워지면 초록 안내선이 옅게 → 겹치는 순간 번쩍 */
+.resolve.near:not(.aligned) .r-smart { opacity: .45; }
 .r-smart-tag text { font-family: var(--ko); font-weight: 800; font-size: 12px; fill: #fff; }
-.resolve.aligned .r-smart, .resolve.aligned .r-smart-tag { animation: r-flash 1.2s ease-out forwards; }
-@keyframes r-flash { 0% { opacity: 0; } 15% { opacity: 1; } 30% { opacity: .35; } 45% { opacity: 1; } 100% { opacity: .9; } }
+.resolve.aligned .r-smart, .resolve.aligned .r-smart-tag { animation: r-flash 1.4s ease-out forwards; }
+.resolve.aligned .r-smart { stroke-width: 1.6; }
+@keyframes r-flash { 0% { opacity: 0; } 12% { opacity: 1; } 24% { opacity: .2; } 36% { opacity: 1; } 48% { opacity: .2; } 60% { opacity: 1; } 100% { opacity: .9; } }
 .cmp-grid .td .verb { display: block; font-size: 1.15em; }
 .cmp-grid .td small { display: block; font-size: 0.85em; font-weight: 600; color: var(--ink-3); }
 

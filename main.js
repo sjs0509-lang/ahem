@@ -1123,7 +1123,7 @@
     // 직접 선택 툴 (흰 화살표) + 점 옮기기
     `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="31" y="31" width="9" height="9" fill="var(--pink)" stroke="var(--ink)" stroke-width="1.3"/><path d="M36 35 L38 26" stroke="var(--ink)" stroke-width="1" stroke-dasharray="2 2"/><path d="M12 6 L12 32 L18.5 26 L23 36 L27 34.2 L22.6 24.6 L31 24.4 Z" fill="#fff" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
     // 스마트 가이드: 정렬
-    `<svg viewBox="0 0 48 48" aria-hidden="true"><line x1="2" y1="26" x2="46" y2="26" stroke="#13b26b" stroke-width="1.2"/><path d="M8 26 H40" stroke="var(--pink)" stroke-width="6" stroke-linecap="round"/><path d="M8 26 H40" stroke="var(--yellow)" stroke-width="2.6" stroke-linecap="round"/><rect x="15" y="9" width="18" height="9" rx="1.5" fill="#13b26b"/><path d="M19 13.5 l3 3 l6 -6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    `<svg viewBox="0 0 48 48" aria-hidden="true"><line x1="2" y1="26" x2="46" y2="26" stroke="var(--guide)" stroke-width="1.2"/><path d="M8 26 H40" stroke="var(--pink)" stroke-width="6" stroke-linecap="round"/><path d="M8 26 H40" stroke="var(--yellow)" stroke-width="2.6" stroke-linecap="round"/><rect x="15" y="9" width="18" height="9" rx="1.5" fill="var(--guide)"/><path d="M19 13.5 l3 3 l6 -6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
   ];
   $("#onboard").innerHTML = OB.map((o, i) => `<section class="screen onboard" id="ob${i + 1}">
       <p class="ob-text">${o.lines.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
@@ -1353,8 +1353,9 @@
       const a = sp.guide[0], b = sp.guide[sp.guide.length - 1], d0 = norm([sp.guide[1][0] - a[0], sp.guide[1][1] - a[1]]);
       const n = sp.guide.length, d1 = norm([b[0] - sp.guide[n - 2][0], b[1] - sp.guide[n - 2][1]]);
       smart = { line: el("path", { class: "r-smart" }, map.arrowLayer), tag: map.pin(sp.guide[Math.floor(n / 2)], "r-smart-tag"), a, b, d0, d1 };
-      el("rect", { x: -34, y: -40, width: 68, height: 22, rx: 3 }, smart.tag.g);
-      el("text", { x: 0, y: -24, "text-anchor": "middle" }, smart.tag.g).textContent = RS.aligned;
+      const tw = RS.aligned.length * 13 + 18;
+      el("rect", { x: -tw / 2, y: -38, width: tw, height: 21, rx: 3 }, smart.tag.g);
+      el("text", { x: 0, y: -23, "text-anchor": "middle" }, smart.tag.g).textContent = RS.aligned;
     }
 
     // 지금 상태 그리기 (화면 크기가 바뀌어도 다시 그릴 수 있게)
@@ -1370,6 +1371,7 @@
         who.moveTo(add(tip, off));
         const { a, b, d0, d1 } = smart, ext = 60 * k;
         smart.line.setAttribute("d", `M${pt(add(a, d0, -ext))} L${polyD(sp.guide).slice(1)} L${pt(add(b, d1, ext))}`);
+        sec.classList.toggle("near", Math.hypot(off[0], off[1]) / k < 22); // 거의 겹치면 초록 안내선이 옅게
       }
     }
 

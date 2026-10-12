@@ -76,7 +76,7 @@ const TEXT = {
 
   matched: "그날 느낀 시간",
   // 해결 화면
-  resolve: { skip: "건너뛰기", aligned: "정렬됨" },
+  resolve: { skip: "건너뛰기", aligned: "정렬" },
   // 동작 안내 (처음 보는 사람용): [마우스, 휴대폰]
   hints: {
     felt: ["핸들을 끌어 점선까지 당겨보세요", "핸들을 손가락으로 끌어 점선까지 당겨보세요"],
@@ -172,7 +172,7 @@ const POINTS = [
     guide: { source: "phone", label: "직진하세요", along: 0.06 },
     fix: {
       source: "person", who: "cyclist", label: "", along: 0.06,
-      action: "align", tool: "스마트 가이드: 정렬",
+      action: "align", tool: "스마트 가이드(Smart Guides): 정렬",
       text: "자전거 탄 아저씨",
       line: "길은 그대로였다. 같은 길을 가는 자전거 한 대가, 지도가 맞다고 보여줬다."
     },
