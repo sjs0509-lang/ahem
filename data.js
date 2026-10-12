@@ -124,7 +124,7 @@ const TEXT = {
     title: ["맞췄다는 건,", "길을 맞혔다는 뜻이 아니다."],
     words: [
       { word: "맞히다", mean: "정답을 골라내는 것", no: true, icon: "target" },
-      { word: "맞추다", mean: "서로 대어 보며 비교하는 것", icon: "align" }
+      { word: "맞추다", mean: "서로 대어 보며 비교하는 것" }
     ],
     // 아래 문장 위에 작게 늘어놓는 그림 (지도 · 휴대폰 · 사람의 말 · 눈앞의 공간)
     things: ["map", "phone", "bubble", "tree"],

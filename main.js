@@ -1706,7 +1706,7 @@
   const MN = TEXT.meaning;
   icN = 0;
   $("#meaning").innerHTML = `<p class="mn-title">${MN.title.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
-    <dl class="mn-words">${MN.words.map((w) => `<div class="${w.no ? "no" : "yes"}">${icons([w.icon])}<dt><span>${esc(w.word)}</span></dt><dd>${esc(w.mean)}</dd></div>`).join("")}</dl>
+    <dl class="mn-words">${MN.words.map((w) => `<div class="${w.no ? "no" : "yes"}">${icons([w.icon]) || `<i class="ic ic-gap"></i>`}<dt><span>${esc(w.word)}</span></dt><dd>${esc(w.mean)}</dd></div>`).join("")}</dl>
     <div class="mn-things">${icons(MN.things)}</div>
     <p class="mn-line">${esc(MN.line)}</p>`;
 
