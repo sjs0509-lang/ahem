@@ -217,6 +217,20 @@ html.v-lock, html.v-lock body { overflow: hidden; }
 .cmp-grid .mini { width: clamp(30px, 3.4vw, 46px); height: auto; flex: none; }
 
 /* ---------- 3-② 깨달음 ---------- */
+.tl { position: relative; width: 100%; padding: 0 28px 34px; }
+.tl-title { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 40px; margin-left: -28px; }
+.tl-bar { position: relative; height: 12px; }
+.tl-on, .tl-off { position: absolute; top: 5px; height: 2px; }
+.tl-on { left: 0; background: var(--ink); }
+.tl-off { right: 0; border-top: 2px dashed var(--ink-3); }
+.tl-dot { position: absolute; top: 0; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; border: 2px solid var(--ink); }
+.tl-lost { position: absolute; top: -26px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--red); }
+.tl-lost span { position: absolute; bottom: 100%; left: 0; transform: translateX(-50%); white-space: nowrap; font-size: 13px; font-weight: 800; color: var(--red); padding-bottom: 4px; }
+.tl-axis { position: relative; height: 18px; margin-top: 10px; }
+.tl-axis span { position: absolute; transform: translateX(-50%); font-family: var(--en); font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.tl-after { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
+.cmp-grid .td-all { grid-column: 2 / -1; color: var(--ink); }
+
 .thesis { display: flex; flex-direction: column; justify-content: center; gap: clamp(40px, 8vh, 80px); max-width: 1100px; margin: 0 auto; }
 .def { display: grid; gap: 4px; padding-left: 14px; border-left: 4px solid var(--ink); }
 .def b { font-size: clamp(18px, 2vw, 24px); font-weight: 800; }

@@ -713,7 +713,7 @@
   function photoFrames(map) {
     const svg = map.svg;
     const leads = el("g", { class: "pf-leads" }, svg), dots = el("g", {}, svg), layer = el("g", {}, svg);
-    const items = PHOTOS.map((ph, i) => {
+    const items = PHOTOS.filter((ph) => !ph.hidden).map((ph, i) => {
       const s = ph.at * LOOP, q = P(s);
       const lead = el("line", { class: "pf-lead" }, leads);
       const dot = el("circle", { class: "pf-dot" }, dots);
@@ -790,7 +790,15 @@
     document.body.appendChild(box);
     const scroll = $(".v-scroll", box), fig = $(".v-photo", box), img = $("img", box);
     let mini = null, pin = null, last = null;
-    img.addEventListener("load", () => fig.classList.add("loaded"));
+    img.addEventListener("load", () => {
+      fig.classList.add("loaded");
+      if (!box.classList.contains("is-phone")) {
+        // 사진 원래 비율 그대로, 화면 안에서 가장 크게
+        const r = img.naturalWidth / img.naturalHeight;
+        fig.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+        fig.style.width = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.72 * r) + "px";
+      }
+    });
     img.addEventListener("error", () => fig.classList.remove("loaded"));
 
     function open(ph) {
@@ -800,6 +808,7 @@
       box.classList.toggle("is-phone", ph.kind === "phone");
       $(".v-none", box).textContent = none ? VW.noPhoto : "";
       fig.classList.remove("loaded");
+      fig.style.aspectRatio = ""; fig.style.width = "";
       $(".v-file", box).textContent = ph.file || "";
       if (!none && ph.file) img.src = "photos/" + ph.file; else img.removeAttribute("src");
       $(".v-time", box).textContent = photoTime(ph);
@@ -952,7 +961,7 @@
       ${row("problem", (p) => `<span>${esc(p.table.problem)}</span>`)}
       ${row("time", (p) => `<span><b class="r">${val(p.actual)}</b> → <b>${val(p.felt)}분</b></span>`)}
       ${row("human", (p) => `${miniScene(p, "human")}<span>${esc(p.table.human)}</span>`)}
-      ${row("photos", (p) => `<span>${esc(p.table.photos || "")}</span>`)}
+      <div class="tr"><p class="th">${esc(TB.photos)}</p><div class="td td-all">${esc(TB.photosAll)}</div></div>
     </div>`;
 
   function drawCompare() {
@@ -973,7 +982,23 @@
   }
 
   // 3-② 깨달음
-  $("#thesis").innerHTML = `<p class="def"><b>${esc(TEXT.definition[0])}</b><span>${esc(TEXT.definition[1])}</span></p>
+  // 사진 시간 막대: 사진마다 점, 길을 잃은 뒤는 비어 있음
+  const TL = TEXT.timeline;
+  const mins = (t) => { const m = /(\d+):(\d+)\s*(AM|PM)?/i.exec(t || ""); if (!m) return null; let h = +m[1] % 12; if (/pm/i.test(m[3] || "")) h += 12; return h * 60 + +m[2]; };
+  const t0 = mins(TL.start), t1 = mins(TL.end), tl = mins(TL.lost);
+  const pct = (t) => (((t - t0) / (t1 - t0)) * 100).toFixed(2) + "%";
+  const shots = PHOTOS.filter((ph) => ph.kind === "photo" && mins(ph.time) != null);
+  const timeline = `<div class="tl">
+      <p class="tl-title">${esc(TL.title)}</p>
+      <div class="tl-bar">
+        <span class="tl-on" style="width:${pct(tl)}"></span><span class="tl-off" style="left:${pct(tl)}"></span>
+        ${shots.map((ph) => `<i class="tl-dot" style="left:${pct(mins(ph.time))}" title="${esc(ph.time + " " + ph.place)}"></i>`).join("")}
+        <b class="tl-lost" style="left:${pct(tl)}"><span>${esc(TL.lostLabel)}</span></b>
+      </div>
+      <div class="tl-axis"><span style="left:0">${esc(TL.start)}</span><span style="left:${pct(tl)}">${esc(TL.lost)}</span><span style="left:100%">${esc(TL.end)}</span></div>
+      <p class="tl-after" style="left:${pct((tl + t1) / 2)}">${esc(TL.after)}</p>
+    </div>`;
+  $("#thesis").innerHTML = timeline + `<p class="def"><b>${esc(TEXT.definition[0])}</b><span>${esc(TEXT.definition[1])}</span></p>
     <p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
 
   /* =========================================================

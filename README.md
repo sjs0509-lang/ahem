@@ -9,7 +9,7 @@
 | 파일 | 내용 |
 |---|---|
 | `data.js` | ★ 모든 문장과 세 지점 데이터. 보통 이것만 고치면 됩니다 |
-| `photos/` | 사진. 지점 화면 `node01.jpg`, `node02.jpg` / 지도 위 사진 프레임 `p01.jpg`~`p12.jpg`, `p14.jpg` |
+| `photos/` | 사진. 지점 화면 `node01.jpg`, `node02.jpg` / 지도 위 사진 프레임 `p01.jpg`~`p08.jpg` |
 | `style.css` | 색과 글꼴. 색은 맨 위 `:root` |
 | `main.js` | 지도, 체감 곡선과 핸들, 비교 화면 |
 | `index.html` | 뼈대 |
@@ -28,7 +28,7 @@
 - `at` 지도 위 위치 (경로 한 바퀴를 0~1로 본 값), `scene` 지도에 더 그릴 공간 (fork / forest / road)
 - `photo` 사진 파일 이름. 파일이 없으면 회색 자리표시가 보입니다.
 - `TEXT` 도입 문장, 읽는 법, 정의, 주제 문장
-- `PHOTOS` 첫 지도 위 사진 프레임: `time`(시각), `place`(장소), `file`(파일 이름), `at`(찍은 곳), `size`(large / small), `kind`(photo / phone / none). 누르면 크게 열리고, 위로 밀면 시각·장소·작은 지도가 나옵니다.
+- `PHOTOS` 첫 지도 위 사진 프레임: `time`(시각), `place`(장소), `file`(파일 이름), `at`(찍은 곳), `size`(large / small), `kind`(photo / phone / none), `hidden`(화면에서만 숨김). 누르면 크게 열리고, 위로 밀면 시각·장소·작은 지도가 나옵니다.
 - `TRIP` 돌아오는 길 기록 (4:33 → 4:57, 약 24분)
 
 ## 미리 보기
