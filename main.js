@@ -244,18 +244,22 @@
     if (!focus) bikeF.g.setAttribute("visibility", "hidden"); // 전체 지도에서는 출발 전
     const flip = bikeGlyph(bikeF.g);
 
+    const hooks = { box: [], bike: [] };
     const map = {
       svg,
+      on(type, fn) { hooks[type].push(fn); },
       setBox(b) {
         box = b;
         svg.setAttribute("viewBox", b.map(f1).join(" "));
         k = b[2] / (svg.clientWidth || 600);
         fixed.forEach(place);
+        hooks.box.forEach((fn) => fn(k));
       },
       setBike(s) {
         bikeF.p = P(s);
         faceAt(flip, s);
         place(bikeF);
+        hooks.bike.forEach((fn) => fn(s));
       },
       // 화면 비율에 맞춘 상자
       fit(b) {
@@ -718,19 +722,23 @@
       const lead = el("line", { class: "pf-lead" }, leads);
       const dot = el("circle", { class: "pf-dot" }, dots);
       const g = el("g", { class: "pf", tabindex: 0, role: "button", "aria-label": `${photoTime(ph)} ${ph.place}` }, layer);
-      g.innerHTML = frameSvg(ph, i);
+      g.innerHTML = `<g class="pf-in">${frameSvg(ph, i)}</g>`;
+      g.setAttribute("visibility", "hidden"); lead.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden");
       const im = $("image", g);
       if (im && ph.file) { const pre = new Image(); pre.onload = () => im.setAttribute("href", im.dataset.src); pre.src = im.dataset.src; }
       g.addEventListener("click", () => viewer.open(ph));
       g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); viewer.open(ph); } });
-      return { ph, s, q, g, lead, dot, wh: FRAME[frameKind(ph)] };
+      return { ph, s, q, g, lead, dot, wh: FRAME[frameKind(ph)], off: [0, 0], on: false };
     });
+    let sc = 1;
 
-    // 찍은 곳 바깥쪽에 놓고, 서로·지점 번호와 겹치지 않게 밀어낸다 (화면 px에서 계산)
+    // 찍은 곳 바깥쪽에 놓고, 서로·지점 번호와 겹치지 않게 밀어낸다.
+    // 전체 지도 크기에서 화면 px로 계산해 두고, 확대해도 찍은 곳에서 같은 px 거리에 둔다
     function layout() {
-      const W = svg.clientWidth, H = svg.clientHeight, vb = svg.viewBox.baseVal;
-      if (!W || !vb.width) return;
-      const k = vb.width / W, sc = W < 640 ? 0.66 : 1, gap = 6 * sc;
+      const W = svg.clientWidth, H = svg.clientHeight;
+      if (!W) return;
+      const ref = map.fit(VIEW), k = ref[2] / W, gap = 6 * (sc = W < 640 ? 0.66 : 1);
+      const vb = { x: ref[0], y: ref[1] };
       const toPx = (p) => [(p[0] - vb.x) / k, (p[1] - vb.y) / k];
       const n = items.map((it) => {
         const a = toPx(it.q), o = outward(it.s), w = it.wh[0] * sc, h = it.wh[1] * sc, d = 30 * sc + Math.max(w, h) / 2;
@@ -764,14 +772,25 @@
           m.x = clamp(m.x, m.w / 2 + 6, W - m.w / 2 - 6); m.y = clamp(m.y, m.h / 2 + 6, H - m.h / 2 - 6);
         });
       }
-      items.forEach((itm, i) => {
-        const c = [vb.x + n[i].x * k, vb.y + n[i].y * k];
-        itm.g.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])}) scale(${(k * sc).toFixed(4)})`);
-        itm.lead.setAttribute("x1", f1(itm.q[0])); itm.lead.setAttribute("y1", f1(itm.q[1]));
-        itm.lead.setAttribute("x2", f1(c[0])); itm.lead.setAttribute("y2", f1(c[1]));
-        itm.dot.setAttribute("cx", f1(itm.q[0])); itm.dot.setAttribute("cy", f1(itm.q[1])); itm.dot.setAttribute("r", f1(3.2 * k));
-      });
+      items.forEach((itm, i) => { itm.off = [n[i].x - n[i].a[0], n[i].y - n[i].a[1]]; });
     }
+    map.on("box", (k) => items.forEach((itm) => {
+      const c = [itm.q[0] + itm.off[0] * k, itm.q[1] + itm.off[1] * k];
+      itm.g.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])}) scale(${(k * sc).toFixed(4)})`);
+      itm.lead.setAttribute("x1", f1(itm.q[0])); itm.lead.setAttribute("y1", f1(itm.q[1]));
+      itm.lead.setAttribute("x2", f1(c[0])); itm.lead.setAttribute("y2", f1(c[1]));
+      itm.dot.setAttribute("cx", f1(itm.q[0])); itm.dot.setAttribute("cy", f1(itm.q[1])); itm.dot.setAttribute("r", f1(3.2 * k));
+    }));
+    // 자전거가 찍은 곳을 지나면 하나씩 떠오르고, 되돌아가면 사라진다
+    map.on("bike", (s) => items.forEach((itm) => {
+      const on = s >= itm.s - 1;
+      if (on === itm.on) return;
+      itm.on = on;
+      const v = on ? "visible" : "hidden";
+      [itm.g, itm.lead, itm.dot].forEach((e) => e.setAttribute("visibility", v));
+      itm.g.classList.remove("pop");
+      if (on) { void itm.g.getBoundingClientRect(); itm.g.classList.add("pop"); }
+    }));
     return { layout };
   }
 
@@ -835,7 +854,6 @@
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !box.hidden) close(); });
     return { open };
   })();
-  const introFrames = photoFrames(introMap);
 
   // 1-② 읽는 법
   const L = TEXT.legend;
@@ -870,8 +888,10 @@
     return map.fit([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h]);
   }
 
+  const frameSets = [];
   function inScene(sec, p, from) {
     const map = buildMap($(".map", sec), p), sp = scenePts(p), to = p.at * LOOP;
+    frameSets.push(photoFrames(map));
     const g = p.guide || {};
     const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label }) : null;
     const DUR = guide ? 3000 : 2000;
@@ -889,6 +909,7 @@
 
   function outScene(sec, p) {
     const map = buildMap($(".map", sec), p), sp = scenePts(p), s = p.at * LOOP;
+    frameSets.push(photoFrames(map));
     const g = p.guide || {};
     // 그때의 안내는 그대로 남아 있고, 노랑 화살표가 실제 길 위에 겹친다
     const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label, wide: !g.to }) : null;
@@ -1022,7 +1043,7 @@
   function layoutAll() {
     introMap.setBox(introMap.fit(VIEW));
     introMap.setBike(0);
-    introFrames.layout();
+    frameSets.forEach((f) => f.layout());
     scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
     felts.forEach((f) => f.render());
     drawCompare();
@@ -1030,6 +1051,63 @@
   layoutAll();
   let rt;
   window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layoutAll, 120); });
+
+  /* =========================================================
+     스크롤 바퀴: 오른쪽 끝 세로 트랙을 따라 바퀴가 굴러간다
+     이동 거리 ÷ 바퀴 둘레만큼 회전 (아래로 = 앞으로, 위로 = 거꾸로). 끌어도 스크롤
+     ========================================================= */
+  const wheelNav = (function () {
+    const nav = document.createElement("div");
+    nav.className = "wnav";
+    nav.setAttribute("aria-hidden", "true");
+    let spokes = "";
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; spokes += `<line x1="${f1(Math.cos(a) * 2.6)}" y1="${f1(Math.sin(a) * 2.6)}" x2="${f1(Math.cos(a) * 15.5)}" y2="${f1(Math.sin(a) * 15.5)}"/>`; }
+    nav.innerHTML = `<div class="wnav-track"></div><div class="wnav-marks"></div>
+      <svg class="wnav-wheel" viewBox="-20 -20 40 40"><g class="wnav-rot">
+        <circle class="wnav-tire" r="17.5"/><g class="wnav-spokes">${spokes}</g><circle class="wnav-hub" r="2.6"/>
+      </g></svg>`;
+    document.body.appendChild(nav);
+    const wheel = $(".wnav-wheel", nav), rot = $(".wnav-rot", nav), marks = $(".wnav-marks", nav);
+    const maxScroll = () => Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const span = () => nav.clientHeight - wheel.clientHeight;
+
+    function update() {
+      const y = clamp(window.scrollY / maxScroll()) * span();
+      wheel.style.transform = `translateY(${f1(y)}px)`;
+      // 굴러간 거리 = 이동 거리, 한 바퀴 = 바퀴 둘레
+      if (!RM.matches) rot.setAttribute("transform", `rotate(${f1((y / (Math.PI * wheel.clientHeight)) * 360)})`);
+      else rot.removeAttribute("transform");
+    }
+    // NODE 01·02·03 위치 표시
+    function placeMarks() {
+      marks.innerHTML = POINTS.map((p) => {
+        const sec = document.getElementById(`p${p.id}-in`);
+        if (!sec) return "";
+        const top = sec.getBoundingClientRect().top + window.scrollY;
+        const y = clamp(top / maxScroll()) * span() + wheel.clientHeight / 2;
+        return `<i style="top:${f1(y)}px" title="${esc(p.id)}"></i>`;
+      }).join("");
+      update();
+    }
+    // 바퀴를 끌면 스크롤 바처럼
+    wheel.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try { wheel.setPointerCapture(e.pointerId); } catch (err) { /* 캡처가 안 돼도 계속 */ }
+      const y0 = e.clientY, s0 = window.scrollY;
+      const move = (ev) => window.scrollTo(0, s0 + ((ev.clientY - y0) / (span() || 1)) * maxScroll());
+      const up = () => { wheel.removeEventListener("pointermove", move); wheel.removeEventListener("pointerup", up); wheel.removeEventListener("pointercancel", up); nav.classList.remove("drag"); };
+      nav.classList.add("drag");
+      wheel.addEventListener("pointermove", move);
+      wheel.addEventListener("pointerup", up);
+      wheel.addEventListener("pointercancel", up);
+    });
+    let ticking = false;
+    window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; update(); }); } }, { passive: true });
+    window.addEventListener("load", placeMarks);
+    return { placeMarks };
+  })();
+  wheelNav.placeMarks();
+  window.addEventListener("resize", () => setTimeout(wheelNav.placeMarks, 160));
 
   if ("IntersectionObserver" in window) {
     const io = new IntersectionObserver((entries) => entries.forEach((en) => {
