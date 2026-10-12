@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stanley Park — 길을 잃었다고 느낀 순간</title>
-  <meta name="description" content="그날 나는 언제 길을 잃었다고 느꼈을까?">
+  <meta name="description" content="밴쿠버 스탠리파크, 자전거를 타다 세 번 길을 잃었다. 그때마다 시간은 다르게 흘렀다.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
@@ -12,56 +12,17 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- 화면은 모두 main.js가 data.js를 읽어 만든다 -->
+  <!-- 1. 도입: 문장 + 전체 지도 / 읽는 법 -->
+  <section class="screen intro" id="intro"></section>
+  <section class="screen legend" id="legend"></section>
 
-  <!-- 1. 첫 화면 -->
-  <header class="hero" id="hero">
-    <span class="corner tl en" data-t="0"></span>
-    <span class="corner tr en" data-t="1"></span>
-    <span class="corner bl ko" data-t="2"></span>
-    <span class="corner br ko" data-t="3"></span>
-    <div class="hero-center">
-      <svg class="hero-curve" viewBox="0 0 600 160" aria-hidden="true"></svg>
-      <p class="hero-q" id="hero-q"></p>
-      <p class="hero-def" id="hero-def"></p>
-      <p class="note hero-scroll"><i class="dot"></i><i class="lead"></i><span id="hero-scroll"></span></p>
-    </div>
-  </header>
+  <!-- 2. 본편: 지점마다 위치 → 상황 → 체감 → 해결 -->
+  <div id="points"></div>
 
-  <!-- 2. 지도 위 한 바퀴 -->
-  <section class="ride" id="ride">
-    <div class="stage" id="stage">
-      <svg class="map" id="map" aria-label="스탠리파크 한 바퀴 경로"></svg>
-
-      <div class="hud tl en">STANLEY PARK</div>
-      <div class="hud bl"><span class="hud-title" id="hud-title"></span></div>
-      <div class="hud br key">
-        <span><i style="background:var(--blue)"></i>SPACE 공간</span>
-        <span><i style="background:var(--yellow)"></i>PERSON 사람</span>
-        <span><i style="background:var(--pink)"></i>PHONE 휴대폰</span>
-        <span class="key-est">시간은 대부분 추정</span>
-      </div>
-
-      <div class="howto" id="howto"></div>
-
-      <div class="close" id="close">
-        <svg class="node-svg" id="node-svg" aria-label="실제 거리와 체감 경로"></svg>
-        <div class="node-media" id="node-media"></div>
-        <p class="node-sentence" id="node-sentence"></p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 3. 완성된 한 바퀴 + 주제 문장 -->
-  <section class="loop" id="loop">
-    <span class="corner tl en">ONE LOOP</span>
-    <span class="corner tr en" id="loop-total"></span>
-    <svg class="map" id="map-full" aria-label="완성된 한 바퀴 경로"></svg>
-    <div class="legend" id="legend"></div>
-  </section>
-
-  <section class="thesis" id="thesis"></section>
-
-  <footer class="footer" id="footer"></footer>
+  <!-- 3. 정리: 비교 / 깨달음 -->
+  <section class="screen compare" id="compare"></section>
+  <section class="screen thesis" id="thesis"></section>
 
   <script src="data.js"></script>
   <script src="main.js"></script>
