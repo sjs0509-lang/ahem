@@ -136,6 +136,22 @@ html.v-lock, html.v-lock body { overflow: hidden; }
   .wnav-marks i { width: 5px; height: 5px; margin: -2.5px 0 0 -9px; }
 }
 
+/* 표지 지도의 은은한 움직임: 아주 느리고 작게, 요소마다 박자가 다르게 */
+.t-coast { display: none; }
+#map-intro .t-coast { display: inline; fill: none; stroke: var(--sea-ink); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 5 9; opacity: .45; animation: t-coast 14s linear infinite, t-coast-o 7s ease-in-out infinite alternate; }
+@keyframes t-coast { to { stroke-dashoffset: -140; } }
+@keyframes t-coast-o { from { opacity: .25; } to { opacity: .6; } }
+#map-intro .t-wave, #map-intro .t-tree, #map-intro .t-star { transform-box: fill-box; transform-origin: center; }
+#map-intro .t-wave { animation: t-wave var(--d, 8s) ease-in-out var(--dl, 0s) infinite alternate; }
+@keyframes t-wave { from { transform: translateX(-5px); } to { transform: translateX(5px); } }
+#map-intro .t-tree { transform-origin: center bottom; animation: t-breathe var(--d, 5s) ease-in-out var(--dl, 0s) infinite; }
+@keyframes t-breathe { 0%, 100% { transform: scale(1) rotate(0); } 35% { transform: scale(1.025) rotate(.9deg); } 70% { transform: scale(.995) rotate(-.7deg); } }
+#map-intro .t-star { animation: t-twinkle var(--d, 3.6s) ease-in-out var(--dl, 0s) infinite; }
+@keyframes t-twinkle { 0%, 100% { transform: rotate(0) scale(.8); opacity: .45; } 50% { transform: rotate(25deg) scale(1.15); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #map-intro .t-wave, #map-intro .t-tree, #map-intro .t-star, #map-intro .t-coast { animation: none; }
+}
+
 /* ---------- 1-② 읽는 법 ---------- */
 .legend { display: flex; align-items: center; justify-content: center; }
 .legend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(22px, 4vh, 40px); font-size: clamp(17px, 2vw, 24px); font-weight: 700; letter-spacing: -0.02em; }

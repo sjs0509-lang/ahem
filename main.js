@@ -139,8 +139,9 @@
   function drawTerrain(svg) {
     const [vx, vy, vw, vh] = VIEW;
     el("rect", { x: vx - 1500, y: vy - 1500, width: vw + 3000, height: vh + 3000, fill: "var(--sea)" }, svg);
-    [[230, 215], [800, 250], [215, 610], [880, 600], [600, 150], [330, 820]].forEach(([x, y]) =>
-      el("path", withOut({ d: `M${x} ${y} q7 -6 14 0 t14 0 t14 0`, fill: "none" }), svg));
+    const beat = (i, a, b) => `--d:${f1(a + ((i * 1.7) % (b - a)))}s;--dl:${f1(-i * 1.3)}s`;
+    [[230, 215], [800, 250], [215, 610], [880, 600], [600, 150], [330, 820]].forEach(([x, y], i) =>
+      el("path", withOut({ d: `M${x} ${y} q7 -6 14 0 t14 0 t14 0`, fill: "none", class: "t-wave", style: beat(i, 6, 10) }), svg));
     // 시내 + 건물 블록
     el("path", withOut({ d: "M" + CITY.map(pt).join(" L") + " L900 1400 L300 1400 Z", fill: "var(--land)" }), svg);
     let n = 0;
@@ -154,6 +155,8 @@
     }
     // 공원 땅 + 둘레길 + 숲
     el("path", withOut({ d: smoothClosedPath(PARK), fill: "var(--grass)" }), svg);
+    // 바다 가장자리의 얇은 물결 외곽선 (표지 지도에서만 보임)
+    el("path", { d: smoothClosedPath(PARK.map((p) => [PARK_C[0] + (p[0] - PARK_C[0]) * 1.04, PARK_C[1] + (p[1] - PARK_C[1]) * 1.04])), class: "t-coast" }, svg);
     const wall = smoothClosedPath(PARK.map((p) => [PARK_C[0] + (p[0] - PARK_C[0]) * 0.93, PARK_C[1] + (p[1] - PARK_C[1]) * 0.93]));
     el("path", { d: wall, fill: "none", stroke: "var(--ink)", "stroke-width": 12 }, svg);
     el("path", { d: wall, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6 }, svg);
@@ -162,7 +165,7 @@
       el("path", { d: fd, fill: "none", stroke: "var(--ink)", "stroke-width": 12, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
       el("path", { d: fd, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
     }
-    TREES_CLEAR.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3] }), svg));
+    TREES_CLEAR.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3], class: "t-tree", style: beat(i, 4, 7) }), svg));
     // 넓은 차도와 차
     if (ROAD_PTS.length > 1) {
       const rd = "M" + ROAD_PTS.map(pt).join(" L");
@@ -184,7 +187,8 @@
     el("path", withOut({ d: "M-25 -13 L0 -30 L25 -13 Z", fill: "var(--car-1)" }), shop);
     el("rect", withOut({ x: -6, y: -2, width: 12, height: 14, fill: "#fff" }), shop);
     [-13, 13].forEach((x) => el("circle", withOut({ cx: x, cy: 4, r: 4.5, fill: "#fff" }), shop));
-    [[190, 175, 7], [885, 300, 6], [180, 830, 6], [890, 790, 7]].forEach(([x, y, r]) => el("path", withOut({ d: star(x, y, r), fill: "var(--blk-2)" }), svg));
+    // 반짝이: 하나씩 번갈아
+    [[190, 175, 7], [885, 300, 6], [180, 830, 6], [890, 790, 7]].forEach(([x, y, r], i) => el("path", withOut({ d: star(x, y, r), fill: "var(--blk-2)", class: "t-star", style: `--d:3.6s;--dl:${f1(-i * 0.9)}s` }), svg));
   }
 
   /* ---------- 지도 하나 만들기 ----------
