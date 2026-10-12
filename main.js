@@ -117,14 +117,24 @@
   });
   const TREE_FILLS = ["var(--tree-1)", "var(--tree-2)", "var(--tree-3)"];
   const BLOCK_FILLS = ["var(--blk-1)", "var(--blk-2)", "var(--blk-3)", "var(--blk-4)", "#ffffff"];
-  // 차도 지점(illus: "road") 주변의 넓은 도로
-  const ROAD_P = POINTS.find((p) => p.illus === "road");
+  // 차도 지점(scene: "road") 주변의 넓은 도로
+  const ROAD_P = POINTS.find((p) => p.scene === "road");
   const ROAD_PTS = [];
   if (ROAD_P) {
     const s = ROAD_P.at * LOOP, half = LOOP * 0.035 + 70;
     for (let x = s - half; x <= s + half; x += 8) ROAD_PTS.push(P(x));
   }
   const SHOP = add(SAMPLES[0], [8, 52]);
+  const FORK_P = POINTS.find((p) => p.scene === "fork");
+  let FORK = null;
+  if (FORK_P) {
+    const s = FORK_P.at * LOOP, q = P(s), t = T(s);
+    const rot = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+    const cand = [1.75, -1.75].map((a) => rot(t, a));
+    const dir = cand.find((d) => inPoly(add(q, d, 80), PARK)) || cand[0];
+    const bend = rot(dir, dir[0] < 0 ? 0.35 : -0.35);
+    FORK = [q, add(q, dir, 30), add(add(q, dir, 30), bend, 40), add(add(q, dir, 30), bend, 72)];
+  }
 
   function drawTerrain(svg) {
     const [vx, vy, vw, vh] = VIEW;
@@ -147,6 +157,11 @@
     const wall = smoothClosedPath(PARK.map((p) => [PARK_C[0] + (p[0] - PARK_C[0]) * 0.93, PARK_C[1] + (p[1] - PARK_C[1]) * 0.93]));
     el("path", { d: wall, fill: "none", stroke: "var(--ink)", "stroke-width": 12 }, svg);
     el("path", { d: wall, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6 }, svg);
+    if (FORK) {
+      const fd = "M" + FORK.map(pt).join(" L");
+      el("path", { d: fd, fill: "none", stroke: "var(--ink)", "stroke-width": 12, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      el("path", { d: fd, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    }
     TREES_CLEAR.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3] }), svg));
     // 넓은 차도와 차
     if (ROAD_PTS.length > 1) {
@@ -154,12 +169,12 @@
       el("path", { d: rd, fill: "none", stroke: "var(--ink)", "stroke-width": 34, "stroke-linejoin": "round" }, svg);
       el("path", { d: rd, fill: "none", stroke: "var(--road)", "stroke-width": 31.6, "stroke-linejoin": "round" }, svg);
       el("path", { d: rd, fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-dasharray": "10 9" }, svg);
-      [0.18, 0.47, 0.8].forEach((f, i) => {
+      [0.06, 0.2, 0.33, 0.46, 0.6, 0.73, 0.87].forEach((f, i) => {
         const k = Math.floor(f * (ROAD_PTS.length - 2)), a = ROAD_PTS[k], b = ROAD_PTS[k + 1];
         const ang = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
         const nrm = norm([-(b[1] - a[1]), b[0] - a[0]]), c = add(a, nrm, i % 2 ? 7.5 : -7.5);
         const car = el("g", { transform: `translate(${f1(c[0])} ${f1(c[1])}) rotate(${f1(ang)})` }, svg);
-        el("rect", withOut({ x: -11, y: -5.5, width: 22, height: 11, rx: 3, fill: ["var(--car-1)", "var(--car-2)", "var(--car-3)"][i] }), car);
+        el("rect", withOut({ x: -11, y: -5.5, width: 22, height: 11, rx: 3, fill: ["var(--car-1)", "var(--car-2)", "var(--car-3)"][i % 3] }), car);
         el("rect", withOut({ x: 1, y: -3.5, width: 6, height: 7, rx: 1, fill: "#fff" }), car);
       });
     }
@@ -173,57 +188,74 @@
   }
 
   /* ---------- 지도 하나 만들기 ----------
-     지형은 확대하면 같이 커지고, 경로 선·번호·글자·자전거는 화면에서 늘 같은 크기 */
+     지형은 확대하면 같이 커지고, 경로 선·번호·글자·자전거·화살표 머리는 화면에서 늘 같은 크기 */
   function buildMap(svg, focus) {
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     drawTerrain(svg);
     const route = "M" + SAMPLES.map(pt).join(" L");
     el("path", { d: route, fill: "none", stroke: "#fff", "stroke-width": 7, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
     el("path", { d: route, fill: "none", stroke: "var(--ink)", "stroke-width": 3, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, svg);
+    const arrowLayer = el("g", {}, svg);
 
-    const fixed = []; // 화면 크기에 고정되는 것들 [g, 위치]
-    const pin = (p, cls) => { const g = el("g", { class: cls }, svg); fixed.push([g, p]); return g; };
+    const fixed = []; // 화면 크기에 고정되는 것들 { g, p, rot }
+    const pin = (p, cls, parent = svg) => { const g = el("g", { class: cls }, parent); const f = { g, p, rot: 0 }; fixed.push(f); return f; };
     const label = (g, x, y, t, anchor, cls) => { const e = el("text", { x, y, "text-anchor": anchor, class: cls }, g); e.textContent = t; return e; };
+    let box = VIEW.slice(), k = 1;
+    const place = (f) => {
+      f.g.setAttribute("transform", `translate(${f1(f.p[0])} ${f1(f.p[1])}) rotate(${f1(f.rot)}) scale(${k.toFixed(4)})`);
+      // 말 라벨은 화면 밖으로 나가지 않게 안쪽으로 민다
+      if (f.span) {
+        const m = 10 * k, lx = f.p[0] + f.span[0] * k, rx = f.p[0] + f.span[1] * k;
+        let dx = 0;
+        if (rx > box[0] + box[2] - m) dx = box[0] + box[2] - m - rx;
+        if (lx + dx < box[0] + m) dx = box[0] + m - lx;
+        f.inner.setAttribute("transform", `translate(${f1(dx / k)} 0)`);
+      }
+    };
 
     [[205, 690, "ENGLISH BAY"], [845, 452, "COAL HARBOUR"], [500, 160, "BURRARD INLET"]].forEach(([x, y, t]) =>
-      label(pin([x, y], "m-water"), 0, 0, t, "middle", "m-water-t"));
+      label(pin([x, y], "m-water").g, 0, 0, t, "middle", "m-water-t"));
 
-    const start = pin(SAMPLES[0], "m-start");
+    const start = pin(SAMPLES[0], "m-start").g;
     el("rect", { x: -6, y: -6, width: 12, height: 12, class: "m-start-sq" }, start);
     label(start, 12, 22, TEXT.start, "start", "m-name");
 
-    // 자전거 (말 없이 이동만)
-    const bike = pin(SAMPLES[0], "m-bike");
-    if (!focus) bike.setAttribute("visibility", "hidden"); // 전체 지도에서는 출발 전
-    const flip = el("g", {}, bike);
-    [-12, 12].forEach((x) => el("circle", { cx: x, cy: 0, r: 9, fill: "#fff", stroke: "var(--ink)", "stroke-width": 2.4 }, flip));
-    el("path", { d: "M-12 0 L-3 -12 L9 -12 L12 0 M-3 -12 L0 0 L-12 0 M9 -12 L7 -17 L12 -17 M-3 -12 L-5 -16 M-4 -16 L2 -27", fill: "none", stroke: "var(--ink)", "stroke-width": 2.2, "stroke-linejoin": "round", "stroke-linecap": "round" }, flip);
-    el("circle", { cx: 3, cy: -32, r: 5, fill: "var(--ink)" }, flip);
-    const bikeEntry = fixed[fixed.length - 1];
-
     POINTS.forEach((p) => {
       const s = p.at * LOOP, o = outward(s), q = P(s);
-      const g = pin(q, "m-point" + (focus && focus !== p ? " dim" : ""));
+      const g = pin(q, "m-point" + (focus && focus !== p ? " dim" : "")).g;
       el("circle", { r: 14, class: "m-dot" }, g);
       label(g, 0, 4.5, p.id, "middle", "m-no");
       const anchor = o[0] > 0.35 ? "start" : o[0] < -0.35 ? "end" : "middle";
       label(g, o[0] * 24, o[1] * 24 + 5, p.name, anchor, "m-name");
     });
 
-    let box = VIEW.slice();
+    // 자전거 그림 (주인공과 앞서 가는 사람이 같이 씀)
+    const bikeGlyph = (parent) => {
+      const flip = el("g", {}, parent);
+      [-12, 12].forEach((x) => el("circle", { cx: x, cy: 0, r: 9, fill: "#fff", stroke: "var(--ink)", "stroke-width": 2.4 }, flip));
+      el("path", { d: "M-12 0 L-3 -12 L9 -12 L12 0 M-3 -12 L0 0 L-12 0 M9 -12 L7 -17 L12 -17 M-3 -12 L-5 -16 M-4 -16 L2 -27", fill: "none", stroke: "var(--ink)", "stroke-width": 2.2, "stroke-linejoin": "round", "stroke-linecap": "round" }, flip);
+      el("circle", { cx: 3, cy: -32, r: 5, fill: "var(--ink)" }, flip);
+      return flip;
+    };
+    const faceAt = (flip, s) => flip.setAttribute("transform", `translate(0 -10)${T(s)[0] < -0.05 ? " scale(-1 1)" : ""}`);
+
+    // 주인공 자전거 (말 없이 이동만)
+    const bikeF = pin(SAMPLES[0], "m-bike");
+    if (!focus) bikeF.g.setAttribute("visibility", "hidden"); // 전체 지도에서는 출발 전
+    const flip = bikeGlyph(bikeF.g);
+
     const map = {
       svg,
       setBox(b) {
         box = b;
         svg.setAttribute("viewBox", b.map(f1).join(" "));
-        const k = b[2] / (svg.clientWidth || 600);
-        fixed.forEach(([g, p]) => g.setAttribute("transform", `translate(${f1(p[0])} ${f1(p[1])}) scale(${k.toFixed(4)})`));
+        k = b[2] / (svg.clientWidth || 600);
+        fixed.forEach(place);
       },
       setBike(s) {
-        const p = P(s);
-        bikeEntry[1] = [p[0], p[1]];
-        flip.setAttribute("transform", `translate(0 -10)${T(s)[0] < -0.05 ? " scale(-1 1)" : ""}`);
-        map.setBox(box);
+        bikeF.p = P(s);
+        faceAt(flip, s);
+        place(bikeF);
       },
       // 화면 비율에 맞춘 상자
       fit(b) {
@@ -232,6 +264,71 @@
         const cx = x + w / 2, cy = y + h / 2;
         if (w / h < a) w = h * a; else h = w / a;
         return [cx - w / 2, cy - h / 2, w, h];
+      },
+
+      /* 안내 화살표: 선은 지도 좌표 위에, 머리와 끝 라벨은 화면 크기 고정.
+         set(f) = 그려진 비율 (끝까지 그려지면 라벨이 나옴) */
+      arrow(pts, color, o = {}) {
+        const g = el("g", { class: "m-arrow" }, arrowLayer);
+        const w = o.wide ? 9 : o.thin ? 4 : 5.5;
+        const halo = el("path", { fill: "none", stroke: "#fff", "stroke-width": w + 4, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, g);
+        const line = el("path", { fill: "none", stroke: color, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }, g);
+        if (o.dashed) { line.setAttribute("stroke-dasharray", "2 11"); halo.setAttribute("stroke-dasharray", "2 11"); }
+        const head = pin(pts[pts.length - 1], "m-head");
+        el("path", { d: `M${f1(w + 8)} 0 L-4 ${f1(-(w + 4))} L-4 ${f1(w + 4)} Z`, fill: color, stroke: "var(--ink)", "stroke-width": 1.2, "stroke-linejoin": "round" }, head.g);
+        let tag = null;
+        if (o.label) {
+          tag = pin(pts[pts.length - 1], "m-say");
+          const tw = o.label.length * 13 + 20;
+          const end = pts[pts.length - 1], prev = pts[Math.max(0, pts.length - 4)], d = norm([end[0] - prev[0], end[1] - prev[1]]);
+          // 화살표가 가는 방향 앞쪽에, 오른쪽이면 오른쪽으로
+          const x = d[0] > 0.3 ? 18 : d[0] < -0.3 ? -18 - tw : -tw / 2;
+          const y = d[1] > 0.5 ? 16 : d[1] < -0.5 ? -46 : -15;
+          tag.inner = el("g", {}, tag.g);
+          tag.span = [x, x + tw];
+          el("rect", { x: f1(x), y: f1(y), width: f1(tw), height: 28, rx: 14, class: "m-say-bg", stroke: color }, tag.inner);
+          label(tag.inner, f1(x + tw / 2), f1(y + 19), o.label, "middle", "m-say-t");
+        }
+        const cum = [0];
+        for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+        const total = cum[cum.length - 1] || 1;
+        return {
+          set(f) {
+            f = clamp(f);
+            const want = total * f, out = [pts[0]];
+            let i = 1;
+            for (; i < pts.length && cum[i] <= want; i++) out.push(pts[i]);
+            if (i < pts.length) { const t = (want - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); out.push([lerp(pts[i - 1][0], pts[i][0], t), lerp(pts[i - 1][1], pts[i][1], t)]); }
+            const d = out.length > 1 ? "M" + out.map(pt).join(" L") : "";
+            line.setAttribute("d", d); halo.setAttribute("d", d);
+            g.setAttribute("visibility", f > 0.01 ? "visible" : "hidden");
+            const a = out[out.length - 1], b = out[Math.max(0, out.length - 2)];
+            head.p = a;
+            head.rot = (Math.atan2(a[1] - b[1], a[0] - b[0]) * 180) / Math.PI;
+            head.g.setAttribute("visibility", f > 0.06 ? "visible" : "hidden");
+            place(head);
+            if (tag) tag.g.setAttribute("visibility", f >= 1 ? "visible" : "hidden");
+          }
+        };
+      },
+
+      /* 다시 이어준 사람: woman / couple / cyclist(앞서 가는 자전거) */
+      person(kind, s) {
+        const q = P(s), side = outward(s);
+        const f = pin(kind === "cyclist" ? q : add(q, side, -26), "m-person");
+        f.g.setAttribute("opacity", 0);
+        let flipC = null;
+        const body = (x) => {
+          el("circle", { cx: x, cy: -21, r: 4.6, fill: "var(--ink)" }, f.g);
+          el("path", { d: `M${x - 6} 0 L${x} -16 L${x + 6} 0 Z`, fill: "#fff", stroke: "var(--ink)", "stroke-width": 1.8, "stroke-linejoin": "round" }, f.g);
+        };
+        if (kind === "woman") body(0);
+        else if (kind === "couple") { body(-6); body(7); }
+        else flipC = bikeGlyph(f.g);
+        return {
+          show(o) { f.g.setAttribute("opacity", o.toFixed(2)); },
+          at(s2) { if (s2 == null || !flipC) return; f.p = P(s2); faceAt(flipC, s2); place(f); }
+        };
       }
     };
     return map;
@@ -520,7 +617,7 @@
       // 카드 아래 변을 기준으로 놓는다 (글 길이가 달라도 지시선이 카드에 닿게)
       let x, y, lx;
       if (right) { x = B[0] + 48; y = B[1] - 56; lx = x; }
-      else { x = Math.max(16, W - 16 - cw); y = B[1] - 96; lx = clamp(B[0], x + 12, x + cw - 12); }
+      else { x = Math.max(16, W - 16 - cw); y = B[1] - 130; lx = clamp(B[0], x + 12, x + cw - 12); }
       card.style.left = f1(x) + "px"; card.style.bottom = f1(H - y) + "px";
       const ln = $("line", refs.lead), dot = $("circle", refs.lead);
       dot.setAttribute("cx", f1(B[0])); dot.setAttribute("cy", f1(B[1]));
@@ -539,43 +636,37 @@
     return { render };
   }
 
-  /* =========================================================
-     상황 일러스트 (외곽선 + 단색)
-     ========================================================= */
-  const ILLUS = (function () {
-    const o = 'stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
-    const tree = (x, y, r, fill, rot = 0) => `<path ${o} fill="${fill}" d="${scallop(x, y, r, 8, rot)}"/>`;
-    return {
-      // 숲길 갈림길, 입구 표지판 없음
-      fork: `<rect ${o} width="200" height="140" fill="var(--grass)"/>
-        <path ${o} fill="var(--sand)" d="M86 140 L92 96 L32 36 L48 30 L100 82 L152 30 L168 36 L108 96 L114 140 Z"/>
-        ${tree(22, 92, 20, "var(--tree-1)")}${tree(178, 98, 22, "var(--tree-2)", 1)}${tree(100, 26, 18, "var(--tree-3)", 2)}${tree(58, 128, 14, "var(--tree-2)", 3)}${tree(150, 132, 12, "var(--tree-1)")}
-        <rect ${o} x="128" y="74" width="4" height="30" fill="#fff"/><rect ${o} x="116" y="62" width="28" height="14" fill="#fff"/>
-        <path ${o} fill="#fff" d="${star(28, 22, 5)}"/>`,
-      // 휴대폰 설명이 가리키는 길은 점선으로만 있고 실제로는 나무만
-      phone: `<rect ${o} width="200" height="140" fill="var(--grass)"/>
-        ${tree(110, 40, 24, "var(--tree-1)")}${tree(152, 52, 22, "var(--tree-2)", 1)}${tree(184, 30, 18, "var(--tree-3)", 2)}${tree(132, 92, 20, "var(--tree-3)", 3)}${tree(176, 106, 20, "var(--tree-1)")}${tree(92, 100, 16, "var(--tree-2)")}
-        <path d="M60 118 C 90 100, 110 80, 140 66" fill="none" stroke="var(--pink)" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round"/>
-        <rect ${o} x="14" y="70" width="30" height="54" rx="5" fill="var(--pink-soft)"/><rect ${o} x="19" y="78" width="20" height="34" fill="#fff"/>
-        <path ${o} fill="#fff" d="M10 20 h70 a6 6 0 0 1 6 6 v20 a6 6 0 0 1 -6 6 h-44 l-10 12 l2 -12 h-18 a6 6 0 0 1 -6 -6 v-20 a6 6 0 0 1 6 -6 z"/>
-        <path d="M20 38 h40" stroke="var(--pink)" stroke-width="2.4" stroke-dasharray="2 5" stroke-linecap="round"/><path ${o} fill="var(--pink)" d="M60 33 l10 5 l-10 5 z"/>`,
-      // 차가 많은 도로 위 작은 자전거, 휴대폰 화살표는 직진
-      road: `<rect ${o} width="200" height="140" fill="var(--land)"/>
-        <path ${o} fill="var(--road)" d="M0 44 L200 30 L200 112 L0 126 Z"/>
-        <path d="M0 85 L200 71" stroke="#fff" stroke-width="2" stroke-dasharray="12 9"/>
-        ${[[30, 58, "var(--car-1)"], [112, 52, "var(--car-2)"], [150, 86, "var(--car-3)"], [62, 100, "var(--car-2)"]].map(([x, y, c]) => `<g transform="translate(${x} ${y}) rotate(-4)"><rect ${o} x="-16" y="-8" width="32" height="16" rx="4" fill="${c}"/><rect ${o} x="2" y="-5" width="9" height="10" rx="1.5" fill="#fff"/></g>`).join("")}
-        <g transform="translate(98 116)"><circle ${o} cx="-6" cy="0" r="5" fill="#fff"/><circle ${o} cx="6" cy="0" r="5" fill="#fff"/><path ${o} fill="none" d="M-6 0 L-1 -7 L5 -7 L6 0 M-1 -7 L0 0"/><circle ${o} cx="1" cy="-13" r="2.6" fill="var(--ink)"/></g>
-        <rect ${o} x="160" y="6" width="26" height="40" rx="4" fill="var(--pink-soft)"/><path ${o} fill="var(--pink)" d="M173 12 l7 10 h-4.5 v14 h-5 v-14 h-4.5 z"/>`
-    };
-  })();
-
   /* ---------- 범례 기호 ---------- */
   const knobGlyph = (c, hollow) => `<svg class="glyph-k" viewBox="0 0 34 22" aria-hidden="true"><line x1="3" y1="19" x2="25" y2="5" stroke="${c}" stroke-width="1.6"/><circle cx="25" cy="5" r="4.5" fill="${hollow ? "var(--bg)" : c}" stroke="${hollow ? c : "none"}" stroke-width="1.4"/></svg>`;
+  const arrowGlyph = (c) => `<svg class="glyph-k" viewBox="0 0 34 22" aria-hidden="true"><path d="M3 15 L24 9" stroke="${c}" stroke-width="3.2" stroke-linecap="round"/><path d="M31 7 L21 4.5 L23.5 13.5 Z" fill="${c}" stroke="var(--ink)" stroke-width="0.8" stroke-linejoin="round"/></svg>`;
   const GLYPH = {
     real: `<svg viewBox="0 0 64 26" aria-hidden="true"><line x1="5" y1="20" x2="59" y2="20" stroke="var(--red)" stroke-width="3.5"/><rect x="1" y="16" width="8" height="8" fill="#fff" stroke="var(--ink)" stroke-width="1.4"/><rect x="55" y="16" width="8" height="8" fill="#fff" stroke="var(--ink)" stroke-width="1.4"/></svg>`,
     felt: `<svg viewBox="0 0 64 26" aria-hidden="true"><path d="M5 20 C 14 16, 50 -12, 59 20" fill="none" stroke="var(--ink)" stroke-width="2.6"/><line x1="59" y1="20" x2="50" y2="2" stroke="var(--ink-2)" stroke-width="1.3"/><circle cx="50" cy="2" r="3.6" fill="var(--ink-2)"/></svg>`,
-    pull: `<svg viewBox="0 0 64 26" aria-hidden="true"><line x1="5" y1="22" x2="59" y2="22" stroke="var(--red)" stroke-width="2"/><path d="M5 22 C 20 18, 46 -2, 59 22" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-dasharray="1 5" stroke-linecap="round"/><line x1="59" y1="22" x2="48" y2="4" stroke="var(--ink-2)" stroke-width="1.3"/><circle cx="48" cy="4" r="4" fill="var(--ink-2)"/><path d="M38 10 l6 -6 M38 4 l6 0 l0 6" fill="none" stroke="var(--ink)" stroke-width="1.4"/></svg>`
+    pull: `<svg viewBox="0 0 64 26" aria-hidden="true"><line x1="5" y1="22" x2="59" y2="22" stroke="var(--red)" stroke-width="2"/><path d="M5 22 C 20 18, 46 -2, 59 22" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-dasharray="1 5" stroke-linecap="round"/><line x1="59" y1="22" x2="48" y2="4" stroke="var(--ink-2)" stroke-width="1.3"/><circle cx="48" cy="4" r="4" fill="var(--ink-2)"/><path d="M38 10 l6 -6 M38 4 l6 0 l0 6" fill="none" stroke="var(--ink)" stroke-width="1.4"/></svg>`,
+    match: `<svg viewBox="0 0 64 26" aria-hidden="true"><path d="M2 22 C 20 22, 30 12, 62 10" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M2 22 C 20 22, 30 12, 62 10" fill="none" stroke="var(--ink)" stroke-width="2.4"/><path d="M8 22 C 22 21, 30 13, 50 11" fill="none" stroke="var(--yellow)" stroke-width="3.4" stroke-linecap="round"/><path d="M58 10.5 L48 6.5 L49 15.5 Z" fill="var(--yellow)" stroke="var(--ink)" stroke-width="0.8"/><path d="M8 22 L40 25" stroke="var(--pink)" stroke-width="2.6" stroke-dasharray="1.5 4" stroke-linecap="round"/><path d="M47 25.6 L38 21 L37.5 28.5 Z" fill="var(--pink)" stroke="var(--ink)" stroke-width="0.8"/></svg>`
   };
+
+  // 비교 표의 아주 작은 화살표 장면: 실제 길(검정) + 안내 화살표
+  function miniScene(p, which) {
+    const path = `<path d="M3 21 C 16 21, 26 13, 45 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M3 21 C 16 21, 26 13, 45 9" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/>`;
+    const onPath = (c, w) => `<path d="M8 20.6 C 18 20, 25 14, 37 10.8" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/><path d="M44 9.3 L35.5 6.6 L37 14 Z" fill="${c}" stroke="var(--ink)" stroke-width="0.6"/>`;
+    let extra = "";
+    if (p.scene === "forest") extra += `<circle cx="34" cy="23" r="4.5" fill="var(--tree-2)" stroke="var(--ink)" stroke-width="0.6"/><circle cx="41" cy="20" r="4" fill="var(--tree-1)" stroke="var(--ink)" stroke-width="0.6"/>`;
+    if (p.scene === "road") extra += [[14, 21.5], [24, 16.5]].map(([x, y]) => `<rect x="${x - 3}" y="${y - 2}" width="6" height="4" rx="1" fill="var(--car-1)" stroke="var(--ink)" stroke-width="0.5"/>`).join("");
+    let arrow = "";
+    const g = p.guide || {};
+    if (which === "guide" && g.source) {
+      arrow = g.to
+        ? `<path d="M8 21 L38 24.5" stroke="${COLOR[g.source]}" stroke-width="2.4" stroke-linecap="round" ${g.dashed ? 'stroke-dasharray="1.5 3.5"' : ""}/><path d="M45 25.3 L36.5 21 L36 28.5 Z" fill="${COLOR[g.source]}" stroke="var(--ink)" stroke-width="0.6"/>`
+        : onPath(COLOR[g.source], 3.4);
+    }
+    if (which === "human") {
+      if (g.source && !g.to) arrow += onPath(COLOR[g.source], 4.6);
+      arrow += onPath(COLOR[p.fix.source] || NO_GUIDE, 2.4);
+    }
+    const dot = which === "guide" && !g.source ? `<circle cx="8" cy="20.6" r="2.6" fill="var(--ink)"/>` : "";
+    return `<svg class="mini" viewBox="0 0 48 30" aria-hidden="true">${path}${extra}${arrow}${dot}</svg>`;
+  }
 
   /* =========================================================
      화면 만들기
@@ -594,13 +685,77 @@
   $("#legend").innerHTML = `<ul class="legend-list">
     <li>${GLYPH.real}<span>${esc(L.real)}</span></li>
     <li>${GLYPH.felt}<span>${esc(L.felt)}</span></li>
-    <li><span class="glyph-pair">${knobGlyph("var(--yellow)")}${knobGlyph("var(--pink)")}</span><span>${esc(L.guide[0])}<br>${esc(L.guide[1])}</span></li>
+    <li><span class="glyph-pair">${arrowGlyph("var(--yellow)")}${arrowGlyph("var(--pink)")}</span><span>${esc(L.guide[0])}<br>${esc(L.guide[1])}</span></li>
+    <li>${GLYPH.match}<span>${esc(L.match)}</span></li>
     <li class="pull">${GLYPH.pull}<span>${esc(L.pull)}</span></li>
   </ul>`;
 
-  // 2. 지점마다 같은 순서: 위치 → 상황 → 체감 → 해결
+  /* ---------- 지점 지도 장면 ----------
+     in : 확대 → 자전거 도착 → 그때의 안내 화살표 (없으면 아무것도 안 나옴)
+     out: 사람이 나타나고 노랑 화살표가 실제 길 위에 겹침 → 자전거가 그 길로 출발 */
+  const alongPts = (s0, s1) => { const out = []; for (let s = s0; s < s1; s += 5) out.push(P(s)); out.push(P(s1)); return out; };
+  function scenePts(p) {
+    const s = p.at * LOOP, lead = LOOP * 0.008, g = p.guide || {};
+    let guide = null;
+    if (g.source && g.to) {
+      const a = P(s + lead * 0.5), out = [];
+      for (let k = 0; k <= 24; k++) out.push([lerp(a[0], g.to[0], k / 24), lerp(a[1], g.to[1], k / 24)]);
+      guide = out;
+    } else if (g.source && g.along) guide = alongPts(s + lead, s + g.along * LOOP);
+    const fix = alongPts(s + lead, s + (p.fix.along || 0.05) * LOOP);
+    return { guide, fix, depart: s + (p.fix.along || 0.05) * LOOP };
+  }
+  function sceneBox(map, p, sp) {
+    const all = [P(p.at * LOOP)].concat(sp.guide || [], sp.fix);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    all.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
+    const pad = 70, w = Math.max(240, x1 - x0 + pad * 2), h = Math.max(240, y1 - y0 + pad * 2);
+    return map.fit([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h]);
+  }
+
+  function inScene(sec, p, from) {
+    const map = buildMap($(".map", sec), p), sp = scenePts(p), to = p.at * LOOP;
+    const g = p.guide || {};
+    const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label }) : null;
+    const DUR = guide ? 3000 : 2000;
+    return {
+      sec, DUR,
+      apply(t) {
+        const full = map.fit(VIEW), z = sceneBox(map, p, sp);
+        const ez = ease(clamp((t - 500) / 1300));
+        map.setBox(full.map((v, k) => lerp(v, z[k], ez)));
+        map.setBike(lerp(from, to, ease(clamp(t / 1800))));
+        if (guide) guide.set(clamp((t - 2000) / 800));
+      }
+    };
+  }
+
+  function outScene(sec, p) {
+    const map = buildMap($(".map", sec), p), sp = scenePts(p), s = p.at * LOOP;
+    const g = p.guide || {};
+    // 그때의 안내는 그대로 남아 있고, 노랑 화살표가 실제 길 위에 겹친다
+    const guide = sp.guide ? map.arrow(sp.guide, COLOR[g.source], { dashed: g.dashed, label: g.label, wide: !g.to }) : null;
+    if (guide) guide.set(1);
+    const fix = map.arrow(sp.fix, COLOR[p.fix.source] || NO_GUIDE, { label: p.fix.label, thin: !!(guide && !g.to) });
+    const who = map.person(p.fix.who, s);
+    const moving = p.fix.who === "cyclist";
+    return {
+      sec, DUR: 3800,
+      apply(t) {
+        map.setBox(sceneBox(map, p, sp));
+        const fp = clamp((t - 700) / (moving ? 1300 : 900));
+        who.show(clamp((t - 200) / 400));
+        // 앞서 가는 자전거: 그 움직임이 곧 노랑 화살표
+        who.at(moving ? lerp(s + LOOP * 0.012, sp.depart, fp) : null);
+        fix.set(fp);
+        map.setBike(lerp(s, sp.depart - (moving ? LOOP * 0.012 : 0), ease(clamp((t - 2000) / 1600))));
+      }
+    };
+  }
+
+  // 2. 지점마다 같은 순서: 지도(안내) → 체감 → 지도(다시 이어짐)
   const host = $("#points");
-  const locs = [], felts = [];
+  const scenes = [], felts = [];
   POINTS.forEach((p, i) => {
     const est = isEst(p.actual) || isEst(p.felt);
     const photo = p.photo
@@ -609,20 +764,16 @@
     const wrap = document.createElement("div");
     wrap.className = "point";
     wrap.innerHTML = `
-      <section class="screen loc" id="p${esc(p.id)}-loc">${kicker(p)}<svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)} 위치"></svg></section>
-      <section class="screen situ" id="p${esc(p.id)}-situ">${kicker(p)}
-        <dl class="rows">
-          <div><dt>${lineGlyph(p.guide.source)}${esc(TEXT.guideLabel)}</dt><dd>${esc(p.guide.text)}</dd></div>
-          <div><dt><i class="sq"></i>${esc(TEXT.spaceLabel)}</dt><dd>${esc(p.space)}</dd></div>
-        </dl>
-        <div class="pics"><div class="illus"><svg viewBox="0 0 200 140" aria-hidden="true">${ILLUS[p.illus] || ""}</svg></div>${photo}</div>
-      </section>
+      <section class="screen loc" id="p${esc(p.id)}-in"><div class="loc-head">${kicker(p)}<p class="loc-space">${esc(p.space)}</p></div>
+        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.space)}"></svg>${photo}</section>
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
         <div class="f-card"><p class="f-card-who">${lineGlyph(p.fix.source)}<span style="--c:${COLOR[p.fix.source] || NO_GUIDE}">${esc(p.fix.text)}</span></p>
           <p class="f-card-line">${esc(p.fix.line || "")}</p></div>
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
-      </section>`;
+      </section>
+      <section class="screen loc" id="p${esc(p.id)}-out"><div class="loc-head">${kicker(p)}</div>
+        <svg class="map" role="img" aria-label="${esc(p.id + " " + p.name)}: ${esc(p.fix.text)}"></svg></section>`;
     host.appendChild(wrap);
 
     const img = wrap.querySelector(".ph.missing");
@@ -634,24 +785,30 @@
       img.appendChild(im);
     }
 
-    const map = buildMap(wrap.querySelector(".loc .map"), p);
-    locs.push({ sec: wrap.querySelector(".loc"), map, from: i ? POINTS[i - 1].at * LOOP : 0, to: p.at * LOOP, p });
-    felts.push(feltView(wrap.querySelector(".felt-svg"), p));
+    const prev = i ? scenePts(POINTS[i - 1]).depart : 0;
+    scenes.push(inScene($(`#p${p.id}-in`, wrap), p, prev));
+    felts.push(feltView($(".felt-svg", wrap), p));
+    scenes.push(outScene($(`#p${p.id}-out`, wrap), p));
   });
 
-  // 3-① 비교: 같은 기준선, 같은 축척
+  // 3-① 비교: 같은 기준선, 같은 축척 + 아래 표
   const maxR = Math.max(...POINTS.map(ratioOf));
   const estIds = POINTS.filter((p) => isEst(p.actual) || isEst(p.felt)).map((p) => p.id);
+  const TB = TEXT.table;
+  const row = (key, cell) => `<div class="tr"><p class="th">${esc(TB[key])}</p>${POINTS.map((p) => `<div class="td${ratioOf(p) === maxR ? " max" : ""}">${cell(p)}</div>`).join("")}</div>`;
   $("#compare").innerHTML = `<p class="cmp-est">${estIds.length ? `${esc(estIds.join("·"))} ${EST}` : ""}</p>
-    <svg class="cmp-svg" role="img" aria-label="세 지점의 실제 시간과 체감 시간 비교"></svg>
-    <div class="cmp-cap">${POINTS.map((p) => `<div class="${ratioOf(p) === maxR ? "max" : ""}">
-      <p class="cmp-name"><span class="no">${esc(p.id)}</span>${esc(p.name)}</p>
-      <p class="cmp-t"><span class="r">실제 ${val(p.actual)}분</span> <span>/ 체감 ${val(p.felt)}분</span></p>
-      <p class="cmp-g">안내 ${esc(p.status)}</p></div>`).join("")}</div>`;
+    <div class="cmp-grid">
+      <div class="tr cmp-chart"><span></span><svg class="cmp-svg" role="img" aria-label="세 지점의 실제 시간과 체감 시간 비교"></svg></div>
+      <div class="tr cmp-head"><span></span>${POINTS.map((p) => `<p class="td${ratioOf(p) === maxR ? " max" : ""}"><span class="no">${esc(p.id)}</span> ${esc(p.name)}</p>`).join("")}</div>
+      ${row("guide", (p) => `${miniScene(p, "guide")}<span>${esc(p.table.guide)}</span>`)}
+      ${row("problem", (p) => `<span>${esc(p.table.problem)}</span>`)}
+      ${row("time", (p) => `<span><b class="r">${val(p.actual)}</b> → <b>${val(p.felt)}분</b></span>`)}
+      ${row("human", (p) => `${miniScene(p, "human")}<span>${esc(p.table.human)}</span>`)}
+    </div>`;
 
   function drawCompare() {
     const svg = $(".cmp-svg"), W = svg.clientWidth, H = svg.clientHeight;
-    const cols = POINTS.length, colW = W / cols, pad = Math.min(24, colW * 0.08);
+    const cols = POINTS.length, colW = W / cols, pad = Math.min(16, colW * 0.08);
     const G = H - 8, top = 8, k = (colW - 2 * pad) / MAX_ACTUAL;
     const rho = loopRho(H * 1.3, k * MAX_ACTUAL);
     svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
@@ -671,32 +828,27 @@
     <p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
 
   /* =========================================================
-     위치 화면: 들어오면 전체 지도에서 이 지점으로 확대, 자전거가 이전 지점에서 이동
+     지도 장면 재생: 화면에 들어오면 처음부터, 나가면 처음 상태로
      ========================================================= */
-  function zoomBox(map, p) {
-    const c = P(p.at * LOOP);
-    return map.fit([c[0] - 130, c[1] - 130, 260, 260]);
-  }
-  function locStart(l) { cancelAnimationFrame(l.raf); l.map.setBox(l.map.fit(VIEW)); l.map.setBike(l.from); l.played = false; }
-  function locEnd(l) { l.map.setBox(zoomBox(l.map, l.p)); l.map.setBike(l.to); }
-  function locPlay(l) {
-    if (l.played) return;
-    l.played = true;
-    if (RM.matches) { locEnd(l); return; }
-    const full = l.map.fit(VIEW), z = zoomBox(l.map, l.p), t0 = performance.now(), dur = 1800;
+  function sceneReset(sc) { cancelAnimationFrame(sc.raf); sc.played = false; sc.apply(0); }
+  function sceneEnd(sc) { sc.apply(sc.DUR); }
+  function scenePlay(sc) {
+    if (sc.played) return;
+    sc.played = true;
+    if (RM.matches) { sceneEnd(sc); return; }
+    const t0 = performance.now();
     const step = (now) => {
-      const t = clamp((now - t0) / dur), e = ease(t), ez = ease(clamp((t - 0.35) / 0.65));
-      l.map.setBox(full.map((v, k) => lerp(v, z[k], ez)));
-      l.map.setBike(lerp(l.from, l.to, e));
-      if (t < 1) l.raf = requestAnimationFrame(step);
+      const t = Math.min(sc.DUR, now - t0);
+      sc.apply(t);
+      if (t < sc.DUR) sc.raf = requestAnimationFrame(step);
     };
-    l.raf = requestAnimationFrame(step);
+    sc.raf = requestAnimationFrame(step);
   }
 
   function layoutAll() {
     introMap.setBox(introMap.fit(VIEW));
     introMap.setBike(0);
-    locs.forEach((l) => (l.played ? locEnd(l) : locStart(l)));
+    scenes.forEach((sc) => (sc.played ? sceneEnd(sc) : sceneReset(sc)));
     felts.forEach((f) => f.render());
     drawCompare();
   }
@@ -706,16 +858,16 @@
 
   if ("IntersectionObserver" in window) {
     const io = new IntersectionObserver((entries) => entries.forEach((en) => {
-      const l = locs.find((x) => x.sec === en.target);
-      if (l) {
-        if (en.intersectionRatio >= 0.55) locPlay(l);
-        else if (!en.isIntersecting) locStart(l);
+      const sc = scenes.find((x) => x.sec === en.target);
+      if (sc) {
+        if (en.intersectionRatio >= 0.55) scenePlay(sc);
+        else if (!en.isIntersecting) sceneReset(sc);
       } else if (en.isIntersecting) en.target.classList.add("in");
     }), { threshold: [0, 0.3, 0.55] });
-    locs.forEach((l) => io.observe(l.sec));
+    scenes.forEach((sc) => io.observe(sc.sec));
     io.observe($("#legend"));
   } else {
-    locs.forEach(locEnd);
+    scenes.forEach(sceneEnd);
     $("#legend").classList.add("in");
   }
 })();
