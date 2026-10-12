@@ -20,6 +20,8 @@
   const norm = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
   const add = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k];
   const RM = window.matchMedia("(prefers-reduced-motion: reduce)");
+  // 효과음 (맨 아래 배경음 부분에서 채움. 바다 소리를 켰을 때만 남)
+  const SOUND = { bell() {} };
   const EST = `<span class="est">${esc(TEXT.est)}</span>`;
   const MAX_ACTUAL = Math.max(...POINTS.map((p) => val(p.actual) || 1));
   const ratioOf = (p) => { const a = val(p.actual) || 1; return (val(p.felt) || a) / a; };
@@ -1223,7 +1225,7 @@
     // 달려오다 급하게 멈춤: 처음엔 가속, 끝까지 속도를 줄이지 않음
     const rush = (x) => { const a = 0.4; x = clamp(x); return (x < a ? (x * x) / (2 * a) : x - a / 2) / (1 - a / 2); };
     const sc = {
-      sec, ARRIVE, DUR, map, fx: null,
+      sec, ARRIVE, DUR, map, fx: null, bell: from === 0, // 대여점에서 처음 출발할 때 따릉따릉
       apply(t) {
         const full = map.fit(VIEW), z = sceneBox(map, p, sp);
         const ez = ease(clamp((t - 500) / 1300));
@@ -1417,6 +1419,7 @@
     }
     // 선이 다음 길로 이어지고 자전거가 다시 출발
     function depart() {
+      SOUND.bell(); // 다시 출발: 따릉따릉
       const t0 = performance.now(), D = RM.matches ? 1 : 1800;
       const step = (now) => {
         const t = clamp((now - t0) / D);
@@ -1739,6 +1742,7 @@
       };
       sc.raf = requestAnimationFrame(step);
     });
+    if (sc.bell) SOUND.bell();
     tween(0, sc.ARRIVE)
       .then(() => live() && sc.mid(live))
       .then(() => { sc.fx = null; if (live()) return tween(sc.ARRIVE, sc.DUR); });
@@ -1980,6 +1984,25 @@
       btn.setAttribute("aria-pressed", on ? "true" : "false");
       btn.setAttribute("aria-label", on ? SD.on : SD.off);
     }
+    // 자전거 벨 "따릉따릉": 쇳소리 배음(어긋난 배수)을 빠르게 두 번씩, 두 묶음
+    SOUND.bell = () => {
+      if (!on || !ctx) return;
+      const t0 = ctx.currentTime + 0.03, out = ctx.createGain();
+      out.gain.value = 0.5;
+      out.connect(master);
+      [0, 0.075, 0.36, 0.435].forEach((dt, k) => {
+        const t = t0 + dt, hit = k % 2 ? 0.75 : 1;
+        [[2350, 1, 0.9], [2357, 0.6, 0.9], [6480, 0.35, 0.45], [12700, 0.12, 0.25]].forEach(([f, a, d]) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.09 * a * hit, t + 0.004);
+          g.gain.exponentialRampToValueAtTime(0.0002, t + d);
+          o.connect(g); g.connect(out);
+          o.start(t); o.stop(t + d + 0.05);
+        });
+      });
+    };
     btn.addEventListener("click", () => { if (on) stop(); else start(); store(on); });
     // 켜 두었던 사람은 화면을 처음 누를 때 다시 켜짐
     if (saved()) {
