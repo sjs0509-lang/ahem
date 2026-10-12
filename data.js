@@ -7,12 +7,14 @@
 
    [지점 항목]
      id      "01" 같은 번호
-     name    지점 이름 (입구 / 출구 / 차도)
+     name    지점 이름 (지도·비교 화면용 짧은 이름)
+     title   지점 화면 위에 쓰는 이름 (없으면 name)
      at      지도 위 위치. 한 바퀴 경로를 0~1로 본 위치 (0 = 대여점)
      guide   그때의 안내. source: "person"(노랑) / "phone"(분홍) / null(없음)
      space   눈앞의 공간 한 줄
      status  안내 상태: "없음" / "어긋남" (비교 화면에 표시)
-     fix     다시 이어준 것. source 색으로 표시
+     fix     곡선을 다시 줄여준 것. 체감 화면 끝에 주석 카드로 나옴
+             text = 무엇이 (source 색으로 표시) / line = 한 줄 문장
      actual  실제 시간(분) → 빨간 직선 길이
      felt    체감 시간(분) → 곡선 길이 (실제의 몇 배인지)
      photo   photos 폴더의 파일 이름. ""이면 photoNote를 씀
@@ -37,7 +39,6 @@ const TEXT = {
 
   guideLabel: "안내",
   spaceLabel: "눈앞의 공간",
-  fixLabel: "다시 이어준 것",
   matched: "그날 느낀 시간",
   scrollDown: "아래로",
   photoSlot: "사진 자리",
@@ -53,31 +54,31 @@ const TEXT = {
 
 const POINTS = [
   {
-    id: "01", name: "입구", at: 0.07,
+    id: "01", name: "입구", at: 0.08,
     guide: { source: null, text: "안내 없음 (휴대폰 안 봄)" },
     space: "입구가 보이지 않음",
     status: "없음",
-    fix: { source: "person", text: "지나가던 여성의 안내" },
+    fix: { source: "person", text: "지나가던 여성의 안내", line: "사람의 안내가 눈앞의 길과 맞아떨어지자, 다시 익숙해졌다." },
     actual: { value: 10, estimated: true },
     felt: { value: 15, estimated: true },
     photo: "node01.jpg", illus: "fork"
   },
   {
-    id: "02", name: "출구", at: 0.75,
-    guide: { source: "phone", text: "휴대폰 GPT의 길 설명" },
+    id: "02", name: "돌아갈 길", title: "돌아갈 길을 찾지 못함", at: 0.52,
+    guide: { source: "phone", text: "휴대폰 GPT가 설명한 대여점으로 돌아가는 길" },
     space: "설명한 길이 눈앞에 없음",
     status: "어긋남",
-    fix: { source: "person", text: "커플의 설명" },
+    fix: { source: "person", text: "커플의 설명", line: "휴대폰이 말한 길은 없었지만, 사람이 알려준 길은 눈앞에 있었다." },
     actual: { value: 10, estimated: true },
     felt: { value: 15, estimated: true },
     photo: "node02.jpg", illus: "phone"
   },
   {
-    id: "03", name: "차도", at: 0.88,
+    id: "03", name: "차도", at: 0.9,
     guide: { source: "phone", text: "휴대폰 지도 “직진”" },
     space: "차가 가득한 도로, 자전거 길 같지 않음",
     status: "어긋남",
-    fix: { source: "person", text: "앞에서 자전거 탄 아저씨를 따라감" },
+    fix: { source: "person", text: "자전거 탄 아저씨의 움직임", line: "말 한마디 없었지만, 같은 자전거가 가는 길이 맞는 길이었다." },
     actual: { value: 7, estimated: false },
     felt: { value: 30, estimated: false },
     photo: "", photoNote: "이 구간 사진 없음", illus: "road"

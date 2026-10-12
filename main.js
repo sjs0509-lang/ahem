@@ -35,9 +35,9 @@
      지도: 단순화한 스탠리파크 (SVG 좌표)
      ========================================================= */
   const VIEW = [150, 120, 770, 760];
-  // 한 바퀴 경로: 대여점 → 공원 입구 → 해안을 따라 반시계 방향 → 출구 → 시내 도로 → 대여점
-  const ROUTE = [[720, 645], [690, 595], [650, 545], [690, 470], [760, 390], [720, 300], [600, 235], [470, 215],
-    [345, 255], [265, 350], [260, 465], [305, 560], [385, 630], [480, 668], [600, 688]];
+  // 경로: 대여점 → 01 입구 → 둘레길 → 02 Burrard 근처 → 공원 가운데(숲 사이)를 가로질러 공원 밖으로 → 03 차도 → 대여점
+  const ROUTE = [[720, 645], [690, 595], [650, 545], [690, 470], [760, 390], [720, 300], [600, 235], [505, 222],
+    [462, 262], [478, 350], [525, 445], [548, 540], [575, 628], [640, 668]];
   const PARK = [[640, 575], [720, 480], [800, 385], [755, 270], [610, 200], [468, 180], [320, 225], [232, 342],
     [228, 475], [283, 590], [372, 655], [470, 640], [560, 610]];
   const CITY = [[300, 900], [372, 690], [470, 672], [560, 642], [650, 605], [740, 512], [900, 470], [900, 900]];
@@ -107,6 +107,14 @@
   const PARK_C = PARK.reduce((c, p) => [c[0] + p[0] / PARK.length, c[1] + p[1] / PARK.length], [0, 0]);
   const TREES = [[430, 330, 34], [515, 290, 30], [600, 330, 36], [372, 410, 30], [462, 405, 38], [556, 412, 32],
     [646, 392, 28], [412, 500, 32], [508, 495, 36], [600, 478, 30], [342, 318, 24], [690, 330, 22], [470, 560, 22], [300, 470, 20]];
+  // 공원을 가로지르는 길 위에 있는 나무는 길 옆으로 비켜 놓는다
+  const TREES_CLEAR = TREES.map(([x, y, r]) => {
+    const q = SAMPLES.reduce((m, p) => (Math.hypot(p[0] - x, p[1] - y) < Math.hypot(m[0] - x, m[1] - y) ? p : m), SAMPLES[0]);
+    const d = Math.hypot(q[0] - x, q[1] - y), need = r + 14;
+    if (d >= need) return [x, y, r];
+    const v = norm(d > 0.1 ? [x - q[0], y - q[1]] : [1, 0]);
+    return [q[0] + v[0] * need, q[1] + v[1] * need, r];
+  });
   const TREE_FILLS = ["var(--tree-1)", "var(--tree-2)", "var(--tree-3)"];
   const BLOCK_FILLS = ["var(--blk-1)", "var(--blk-2)", "var(--blk-3)", "var(--blk-4)", "#ffffff"];
   // 차도 지점(illus: "road") 주변의 넓은 도로
@@ -139,7 +147,7 @@
     const wall = smoothClosedPath(PARK.map((p) => [PARK_C[0] + (p[0] - PARK_C[0]) * 0.93, PARK_C[1] + (p[1] - PARK_C[1]) * 0.93]));
     el("path", { d: wall, fill: "none", stroke: "var(--ink)", "stroke-width": 12 }, svg);
     el("path", { d: wall, fill: "none", stroke: "var(--sand)", "stroke-width": 9.6 }, svg);
-    TREES.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3] }), svg));
+    TREES_CLEAR.forEach(([x, y, r], i) => el("path", withOut({ d: scallop(x, y, r, 8 + (i % 3), i * 0.7), fill: TREE_FILLS[i % 3] }), svg));
     // 넓은 차도와 차
     if (ROAD_PTS.length > 1) {
       const rd = "M" + ROAD_PTS.map(pt).join(" L");
@@ -252,9 +260,10 @@
     const c2Of = (k) => [B[0] + (k[0] - B[0]) * gain, B[1] + (k[1] - B[1]) * gain];
 
     // n = 고리 수. 고리는 곡선 가운데(길이 기준 22~78%)에만 생긴다
-    function shape(knob, n) {
-      const c2 = c2Of(knob), N = 360, base = [];
-      for (let i = 0; i <= N; i++) base.push(bz(A, c1, c2, B, i / N));
+    // k1 = 왼쪽 핸들 길이 비율, kr = 고리 크기 비율 (곡선이 펴질 때 둘 다 0으로 줄어듦)
+    function shape(knob, n, k1 = 1, kr = 1) {
+      const c2 = c2Of(knob), cc = [lerp(A[0], c1[0], k1), lerp(A[1], c1[1], k1)], N = 360, base = [];
+      for (let i = 0; i <= N; i++) base.push(bz(A, cc, c2, B, i / N));
       const cum = [0];
       for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + Math.hypot(base[i][0] - base[i - 1][0], base[i][1] - base[i - 1][1]));
       const tot = cum[N] || 1, pts = [];
@@ -265,7 +274,7 @@
           const u = clamp((cum[i] / tot - 0.22) / 0.56);
           if (u > 0 && u < 1) {
             const a = base[i - 1], b = base[i + 1], t = norm([b[0] - a[0], b[1] - a[1]]), nv = [-t[1], t[0]];
-            const w = Math.pow(Math.sin(Math.PI * u), 2), th = 2 * Math.PI * n * u;
+            const w = kr * Math.pow(Math.sin(Math.PI * u), 2), th = 2 * Math.PI * n * u;
             q = [q[0] + w * rho * (-Math.sin(th) * t[0] + (1 - Math.cos(th)) * nv[0]),
               q[1] + w * rho * (-Math.sin(th) * t[1] + (1 - Math.cos(th)) * nv[1])];
           }
@@ -303,10 +312,20 @@
   }
 
 
-  function feltView(svg, p, onMatch) {
+  /* ---------- 체감 화면 ----------
+     ① 거의 일직선 + 짧은 핸들 → ② 오른쪽 핸들을 점선까지 당기면 자석처럼 맞춤
+     → ③ 작은 바퀴가 늘어난 곡선을 힘겹게 굴러감 (시간 ∝ 체감, 숫자가 같이 올라감)
+     → ④ 끝에 가까워질수록 핸들이 줄고 곡선이 빨간 직선 위로 펴짐
+     → ⑤ 도착 앵커 옆 주석 카드 → ⑥ 아래로 안내                              */
+  const MAX_FELT = Math.max(...POINTS.map((q) => val(q.felt) || 0));
+  const ROLL_MAX_MS = 6000;
+
+  function feltView(svg, p) {
+    const sec = svg.closest(".felt"), card = $(".f-card", sec);
     const src = p.guide && p.guide.source, hc = COLOR[src] || NO_GUIDE;
-    const r = ratioOf(p);
-    let W, H, M, ghost, ghostKnob, knobTop, pitch, base, n, matched = false, anim, refs;
+    const r = ratioOf(p), felt = val(p.felt) || 0;
+    let W, H, M, ghost, ghostKnob, knobTop, pitch, base, n, refs, anim, roll;
+    let state = "idle"; // idle → playing → done
 
     function layout() {
       W = svg.clientWidth; H = svg.clientHeight;
@@ -328,6 +347,7 @@
         const a = (i / 32) * Math.PI * 2;
         spokes += `<line x1="${f1(Math.cos(a) * R * 0.07)}" y1="${f1(Math.sin(a) * R * 0.07)}" x2="${f1(Math.cos(a) * R * 0.86)}" y2="${f1(Math.sin(a) * R * 0.86)}"/>`;
       }
+      const rw = clamp(H * 0.022, 11, 17);
       svg.innerHTML = `
         <line class="f-ground" x1="0" y1="${f1(G)}" x2="${f1(W)}" y2="${f1(G)}"/>
         <g transform="translate(${f1(cx)} ${f1(G - R)})">
@@ -335,19 +355,24 @@
           <g class="f-spokes">${spokes}</g>
           <circle class="f-hub" r="${f1(R * 0.07)}"/>
         </g>
-        <path class="f-ghost" d="${polyD(M.shape(ghost.knob, ghost.n).pts)}"/>
-        <circle class="f-ghost-knob" r="9" cx="${f1(ghostKnob[0])}" cy="${f1(ghostKnob[1])}"/>
+        <g class="f-target"><path class="f-ghost" d="${polyD(M.shape(ghost.knob, ghost.n).pts)}"/>
+          <circle class="f-ghost-knob" r="9" cx="${f1(ghostKnob[0])}" cy="${f1(ghostKnob[1])}"/></g>
         <line class="f-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
         <path class="f-curve"/>
-        <line class="f-handle" stroke="${hc}" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(M.c1[0])}" y2="${f1(M.c1[1])}"/>
-        <circle class="f-knob" fill="${hc}" r="5.5" cx="${f1(M.c1[0])}" cy="${f1(M.c1[1])}"/>
+        <g class="f-left"><line class="f-handle" stroke="${hc}" x1="${f1(A[0])}" y1="${f1(G)}"/><circle class="f-knob" fill="${hc}" r="5.5"/></g>
         <g class="f-drag"><line class="f-handle" stroke="${hc}"/><circle class="f-knob" fill="${hc}" r="9"/><circle class="f-hit" r="28"/></g>
         ${[A, B].map((q) => `<rect class="f-anchor" x="${f1(q[0] - 6)}" y="${f1(q[1] - 6)}" width="12" height="12"/>`).join("")}
         <text class="f-t f-real-t" x="${f1((A[0] + B[0]) / 2)}" y="${f1(G + 30)}" text-anchor="middle">실제 ${val(p.actual)}분</text>
-        <text class="f-t f-felt-t" text-anchor="middle"><tspan class="f-day"></tspan><tspan class="f-min"></tspan></text>`;
+        <text class="f-t f-felt-t" text-anchor="middle"><tspan class="f-day"></tspan><tspan class="f-min"></tspan></text>
+        <g class="f-roll" visibility="hidden"><g class="f-roll-w">
+          <circle class="f-roll-tire" r="${f1(rw)}"/>${[0, 45, 90, 135].map((d) => `<line x1="${f1(-rw)}" y1="0" x2="${f1(rw)}" y2="0" transform="rotate(${d})"/>`).join("")}
+        </g></g>
+        <g class="f-lead" visibility="hidden"><line/><circle r="4"/></g>`;
       refs = {
-        curve: $(".f-curve", svg), drag: $(".f-drag", svg), dragLine: $(".f-drag line", svg),
-        knobs: svg.querySelectorAll(".f-drag circle"), text: $(".f-felt-t", svg), day: $(".f-day", svg), min: $(".f-min", svg)
+        curve: $(".f-curve", svg), drag: $(".f-drag", svg), dragLine: $(".f-drag line", svg), dragKnobs: svg.querySelectorAll(".f-drag circle"),
+        leftLine: $(".f-left line", svg), leftKnob: $(".f-left circle", svg),
+        text: $(".f-felt-t", svg), day: $(".f-day", svg), min: $(".f-min", svg),
+        roll: $(".f-roll", svg), rollW: $(".f-roll-w", svg), lead: $(".f-lead", svg), rw
       };
       refs.drag.addEventListener("pointerdown", start);
       refs.drag.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
@@ -360,47 +385,56 @@
       else { base = [q[0], M.capY]; n = (M.capY - q[1]) / pitch; }
     }
 
-    function draw() {
-      const s = M.shape(base, n), knob = knobOf();
+    // 곡선 + 양쪽 핸들. knob = 화면에 보이는 오른쪽 손잡이, k1 = 왼쪽 핸들 길이 비율
+    function drawShape(s, knob, k1) {
       refs.curve.setAttribute("d", polyD(s.pts));
       refs.dragLine.setAttribute("x1", f1(M.B[0])); refs.dragLine.setAttribute("y1", f1(M.B[1]));
       refs.dragLine.setAttribute("x2", f1(knob[0])); refs.dragLine.setAttribute("y2", f1(knob[1]));
-      refs.knobs.forEach((ci) => { ci.setAttribute("cx", f1(knob[0])); ci.setAttribute("cy", f1(knob[1])); });
-      const felt = matched ? val(p.felt) : (val(p.actual) || 0) * s.ratio;
-      const top = topOf(s.pts);
-      const x = f1(clamp(top[0], 90, W - 90)), y = Math.min(top[1] - 18, M.A[1] - 22);
+      refs.dragKnobs.forEach((ci) => { ci.setAttribute("cx", f1(knob[0])); ci.setAttribute("cy", f1(knob[1])); });
+      const c = [lerp(M.A[0], M.c1[0], k1), lerp(M.A[1], M.c1[1], k1)];
+      refs.leftLine.setAttribute("x2", f1(c[0])); refs.leftLine.setAttribute("y2", f1(c[1]));
+      refs.leftKnob.setAttribute("cx", f1(c[0])); refs.leftKnob.setAttribute("cy", f1(c[1]));
+    }
+    function label(s, minutes, day) {
+      const top = topOf(s.pts), flat = M.A[1] - top[1] < 40;
+      // 거의 펴졌으면 직선 가운데 위에
+      const x = f1(clamp(flat ? (M.A[0] + M.B[0]) / 2 : top[0], 90, W - 90)), y = Math.min(top[1] - 18, M.A[1] - 22);
       refs.text.setAttribute("x", x); refs.text.setAttribute("y", f1(y));
       refs.day.setAttribute("x", x); refs.day.setAttribute("dy", "-1.6em");
-      refs.day.textContent = matched ? TEXT.matched : "";
-      refs.min.setAttribute("x", x); refs.min.setAttribute("dy", matched ? "1.6em" : "0");
-      refs.min.textContent = `체감 ${Math.round(felt)}분`;
+      refs.day.textContent = day ? TEXT.matched : "";
+      refs.min.setAttribute("x", x); refs.min.setAttribute("dy", day ? "1.6em" : "0");
+      refs.min.textContent = `체감 ${Math.round(minutes)}분`;
+    }
+    function draw() {
+      const s = M.shape(base, n);
+      drawShape(s, knobOf(), 1);
+      label(s, (val(p.actual) || 0) * s.ratio, false);
     }
 
     function start(e) {
+      if (state !== "idle") return;
       e.preventDefault();
       cancelAnimationFrame(anim);
       const target = e.currentTarget;
       try { target.setPointerCapture(e.pointerId); } catch (err) { /* 캡처가 안 돼도 드래그는 계속 */ }
-      const move = (ev) => {
-        const b = svg.getBoundingClientRect();
-        fromKnob([clamp(ev.clientX - b.left, 10, W - 10), clamp(ev.clientY - b.top, knobTop - 40, M.A[1] + 30)]);
-        // 점선 목표 가까이 오면 자석처럼 딱 맞춤
-        const near = Math.abs(M.shape(base, n).ratio - r) < r * 0.1;
-        if (r > M.RESTR + 0.1 && near) {
-          base = ghost.knob.slice(); n = ghost.n;
-          if (!matched) { matched = true; svg.closest(".felt").classList.add("matched"); onMatch && onMatch(); }
-        } else if (!near) {
-          matched = false;
-          svg.closest(".felt").classList.remove("matched");
-        }
-        draw();
-      };
-      const end = () => {
+      const stop = () => {
         target.removeEventListener("pointermove", move);
         target.removeEventListener("pointerup", end);
         target.removeEventListener("pointercancel", end);
-        if (!matched) springBack();
       };
+      const end = () => { stop(); springBack(); };
+      function move(ev) {
+        const b = svg.getBoundingClientRect();
+        fromKnob([clamp(ev.clientX - b.left, 10, W - 10), clamp(ev.clientY - b.top, knobTop - 40, M.A[1] + 30)]);
+        // 점선 목표 가까이 오면 자석처럼 딱 맞추고 바로 굴러가기 시작
+        if (r > M.RESTR + 0.1 && Math.abs(M.shape(base, n).ratio - r) < r * 0.1) {
+          base = ghost.knob.slice(); n = ghost.n;
+          stop();
+          play();
+          return;
+        }
+        draw();
+      }
       target.addEventListener("pointermove", move);
       target.addEventListener("pointerup", end);
       target.addEventListener("pointercancel", end);
@@ -418,10 +452,89 @@
       anim = requestAnimationFrame(step);
     }
 
+    // 폴리라인 위 길이 비율 f 지점과 진행 방향
+    function along(pts, f) {
+      const seg = [];
+      let L = 0;
+      for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); L += d; }
+      let want = L * clamp(f), i = 0;
+      while (i < seg.length - 1 && want > seg[i]) { want -= seg[i]; i++; }
+      const a = pts[i], b = pts[i + 1], t = seg[i] ? want / seg[i] : 0;
+      return { p: [lerp(a[0], b[0], t), lerp(a[1], b[1], t)], dir: norm([b[0] - a[0], b[1] - a[1]]), dist: L * clamp(f) };
+    }
+
+    // ③④ 굴러가며 펴짐. f = 0..1 진행
+    const FLAT_FROM = 0.55;
+    let travelled = 0, lastAt = null;
+    function frame(f) {
+      const g = ease(clamp((f - FLAT_FROM) / (1 - FLAT_FROM)));
+      const shown = ghost.n > 0 ? ghostKnob : ghost.knob;
+      const kb = [lerp(ghost.knob[0], M.B[0], g), lerp(ghost.knob[1], M.B[1], g)];
+      const s = M.shape(kb, ghost.n * (1 - g), 1 - g, (1 - g) * (1 - g));
+      drawShape(s, [lerp(shown[0], M.B[0], g), lerp(shown[1], M.B[1], g)], 1 - g);
+      label(s, felt * f, true);
+      // 작은 바퀴: 곡선 위를 굴러감 + 살짝 덜컹
+      const at = along(s.pts, f), up = [at.dir[1], -at.dir[0]];
+      if (lastAt) travelled += Math.hypot(at.p[0] - lastAt[0], at.p[1] - lastAt[1]);
+      lastAt = at.p;
+      const bump = Math.abs(Math.sin(travelled / 11)) * 2.2 * (1 - g);
+      const c = add(at.p, up, refs.rw + 1.5 + bump);
+      refs.roll.setAttribute("visibility", "visible");
+      refs.roll.setAttribute("transform", `translate(${f1(c[0])} ${f1(c[1])})`);
+      refs.rollW.setAttribute("transform", `rotate(${f1((travelled / refs.rw) * 57.3)})`);
+    }
+
+    function play() {
+      state = "playing";
+      sec.classList.add("playing");
+      cancelAnimationFrame(anim);
+      travelled = 0; lastAt = null;
+      const dur = RM.matches ? 500 : Math.max(2200, (ROLL_MAX_MS * felt) / (MAX_FELT || 1));
+      const t0 = performance.now();
+      const step = (now) => {
+        const t = clamp((now - t0) / dur);
+        // 힘겹게: 느리게 출발하고, 속도가 고르지 않게 (조금씩 멈칫)
+        const f = RM.matches ? t : clamp(ease(t) + 0.012 * Math.sin(t * Math.PI * 14) * Math.sin(t * Math.PI));
+        frame(f);
+        if (t < 1) roll = requestAnimationFrame(step);
+        else finish();
+      };
+      roll = requestAnimationFrame(step);
+    }
+
+    // ⑤ 완전히 펴진 순간: 도착 앵커 옆 주석 카드
+    function finish() {
+      state = "done";
+      frame(1);
+      refs.roll.setAttribute("visibility", "hidden");
+      sec.classList.remove("playing");
+      sec.classList.add("done");
+      placeCard();
+    }
+
+    function placeCard() {
+      const B = M.B, right = W - B[0] > 340;
+      const cw = Math.min(300, W - 32);
+      card.style.width = cw + "px";
+      card.classList.add("on");
+      // 카드 아래 변을 기준으로 놓는다 (글 길이가 달라도 지시선이 카드에 닿게)
+      let x, y, lx;
+      if (right) { x = B[0] + 48; y = B[1] - 56; lx = x; }
+      else { x = Math.max(16, W - 16 - cw); y = B[1] - 96; lx = clamp(B[0], x + 12, x + cw - 12); }
+      card.style.left = f1(x) + "px"; card.style.bottom = f1(H - y) + "px";
+      const ln = $("line", refs.lead), dot = $("circle", refs.lead);
+      dot.setAttribute("cx", f1(B[0])); dot.setAttribute("cy", f1(B[1]));
+      ln.setAttribute("x1", f1(B[0])); ln.setAttribute("y1", f1(B[1]));
+      ln.setAttribute("x2", f1(lx)); ln.setAttribute("y2", f1(y));
+      refs.lead.setAttribute("visibility", "visible");
+    }
+
     function render() {
+      cancelAnimationFrame(anim);
       layout();
-      if (matched) { base = ghost.knob.slice(); n = ghost.n; } else { base = M.rest.slice(); n = 0; }
-      draw();
+      if (state === "idle") { base = M.rest.slice(); n = 0; draw(); return; }
+      cancelAnimationFrame(roll);
+      finish();
     }
     return { render };
   }
@@ -467,7 +580,7 @@
   /* =========================================================
      화면 만들기
      ========================================================= */
-  const kicker = (p, est) => `<p class="kicker"><span class="no">${esc(p.id)}</span>${esc(p.name)}${est ? EST : ""}</p>`;
+  const kicker = (p, est) => `<p class="kicker"><span class="no">${esc(p.id)}</span>${esc(p.title || p.name)}${est ? EST : ""}</p>`;
   const lineGlyph = (src) => knobGlyph(COLOR[src] || NO_GUIDE, !src);
 
   // 1-① 문장 + 전체 지도
@@ -506,11 +619,9 @@
       </section>
       <section class="screen felt" id="p${esc(p.id)}-felt">${kicker(p, est)}
         <svg class="felt-svg" role="img" aria-label="실제 ${val(p.actual)}분, 체감 ${val(p.felt)}분"></svg>
+        <div class="f-card"><p class="f-card-who">${lineGlyph(p.fix.source)}<span style="--c:${COLOR[p.fix.source] || NO_GUIDE}">${esc(p.fix.text)}</span></p>
+          <p class="f-card-line">${esc(p.fix.line || "")}</p></div>
         <p class="down">↓ ${esc(TEXT.scrollDown)}</p>
-      </section>
-      <section class="screen fix" id="p${esc(p.id)}-fix">${kicker(p)}
-        <p class="fix-label">${esc(TEXT.fixLabel)}</p>
-        <p class="fix-line">${lineGlyph(p.fix.source)}<span style="--c:${COLOR[p.fix.source] || NO_GUIDE}">${esc(p.fix.text)}</span></p>
       </section>`;
     host.appendChild(wrap);
 

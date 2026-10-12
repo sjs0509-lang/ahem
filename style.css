@@ -143,15 +143,27 @@ p, dl, dd, figure { margin: 0; }
 .f-real-t { fill: var(--red); }
 .f-day { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
 .down { position: absolute; left: 0; right: 0; bottom: calc(var(--pad) * 0.8); text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-3); opacity: 0; transition: opacity .4s; pointer-events: none; }
-.felt.matched .down { opacity: 1; }
+.felt.done .down { opacity: 1; transition-delay: .6s; }
+.felt.playing .f-drag, .felt.done .f-drag { pointer-events: none; }
+.felt.playing .f-target, .felt.done .f-target { opacity: 0; transition: opacity .4s; }
+.felt.done .f-curve, .felt.done .f-left, .felt.done .f-drag { visibility: hidden; }
+.f-roll-tire { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
+.f-roll line { stroke: var(--ink); stroke-width: 1; }
+.f-lead line { stroke: var(--ink); stroke-width: 1; }
+.f-lead circle { fill: var(--ink); }
 
-/* ---------- 2. 해결 ---------- */
-.fix { min-height: 70svh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; max-width: 980px; margin: 0 auto; gap: 12px; }
-.fix .kicker { position: absolute; top: var(--pad); left: var(--pad); }
-.fix-label { font-size: 13px; font-weight: 700; color: var(--ink-2); }
-.fix-line { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: clamp(22px, 3.4vw, 44px); line-height: 1.3; letter-spacing: -0.035em; }
-.fix-line svg { width: 46px; height: 30px; flex: none; }
-.fix-line span { background: linear-gradient(transparent 62%, color-mix(in srgb, var(--c) 55%, transparent) 62%); }
+/* 끝점 옆 주석 카드 */
+.f-card {
+  position: absolute; z-index: 3; display: none;
+  background: var(--bg); border: 1.5px solid var(--ink); padding: 12px 14px;
+  opacity: 0; transform: translateY(6px); transition: opacity .4s, transform .4s;
+}
+.f-card.on { display: block; animation: card-in .45s ease-out forwards; }
+@keyframes card-in { to { opacity: 1; transform: none; } }
+.f-card-who { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; letter-spacing: -0.02em; }
+.f-card-who svg { width: 30px; height: 20px; flex: none; }
+.f-card-who span { background: linear-gradient(transparent 60%, color-mix(in srgb, var(--c) 60%, transparent) 60%); }
+.f-card-line { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
 
 /* ---------- 3-① 비교 ---------- */
 .compare { display: flex; flex-direction: column; justify-content: center; gap: 14px; max-width: 1200px; margin: 0 auto; }
@@ -185,10 +197,10 @@ p, dl, dd, figure { margin: 0; }
   .illus { width: 62%; }
   .polaroid { width: 34%; padding: 5px 5px 18px; }
   .legend-list li { grid-template-columns: 72px 1fr; gap: 12px; }
-  .fix-line svg { width: 34px; height: 22px; }
   .cmp-svg { height: 50svh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .legend-list li, .down { transition: none; }
+  .legend-list li, .down, .f-card { transition: none; }
+  .f-card.on { animation: none; opacity: 1; transform: none; }
 }
