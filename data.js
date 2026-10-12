@@ -176,9 +176,9 @@ const POINTS = [
       source: "person", who: "cyclist", label: "", along: 0.06,
       action: "align", tool: "스마트 가이드(Smart Guides): 정렬",
       text: "자전거 탄 아저씨",
-      line: "길은 그대로였다. 같은 길을 가는 자전거 한 대가, 지도가 맞다고 보여줬다."
+      line: "어디로 가야 할지 몰랐다. 너무 익숙하게 가는 아저씨를 보고, 그 길을 그냥 따라갔다."
     },
-    table: { guide: "휴대폰(지도)", problem: "안내는 맞았지만 공간에서 확인할 수 없었다", human: "맞췄다", humanSub: "같은 길이 맞다고 보여줌" },
+    table: { guide: "휴대폰(지도)", problem: "안내는 맞았지만 공간에서 확인할 수 없었다", human: "맞췄다", humanSub: "익숙하게 가는 길을 따라감" },
     actual: { value: 7, estimated: false },
     felt: { value: 30, estimated: false }
   }
