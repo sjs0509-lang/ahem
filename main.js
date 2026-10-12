@@ -354,77 +354,50 @@
   }
 
   /* =========================================================
-     체감 곡선
-     A–B 빨간 직선 = 실제 시간 (모든 지점이 같은 축척: 1분 = 같은 길이)
-     왼쪽 핸들은 고정, 오른쪽 핸들만 당김. 곡선 길이 ÷ 직선 길이 × 실제 = 체감.
-     곡선이 화면 높이를 넘어야 할 만큼 길어지면 꼭대기가 고리처럼 꼬인다.
+     체감 곡선 = 언덕
+     A–B 빨간 직선 = 실제 시간. 곡선 길이 ÷ 직선 길이 × 실제 = 체감.
+     오른쪽 핸들을 위로 당기면 왼쪽 핸들도 좌우 대칭으로 같이 올라가 언덕이 높아지기만 한다.
+     두 핸들의 x는 고정이라 곡선은 늘 왼쪽 → 오른쪽으로만 가고, 꼬이지 않는다.
+     u = 핸들 높이 ÷ 직선 길이 (모양은 이 값 하나로 정해짐)
      ========================================================= */
-  const DIR = [Math.cos((100 * Math.PI) / 180), -Math.sin((100 * Math.PI) / 180)];
-  const bz = (a, b, c, d, t) => { const u = 1 - t; return [0, 1].map((k) => u * u * u * a[k] + 3 * u * u * t * b[k] + 3 * u * t * t * c[k] + t * t * t * d[k]); };
-
+  const bz = (a, b, c, d, t) => { const v = 1 - t; return [0, 1].map((k) => v * v * v * a[k] + 3 * v * v * t * b[k] + 3 * v * t * t * c[k] + t * t * t * d[k]); };
   const ring = (ro, ri) => `M${ro} 0 A${ro} ${ro} 0 1 0 ${-ro} 0 A${ro} ${ro} 0 1 0 ${ro} 0 Z M${ri} 0 A${ri} ${ri} 0 1 0 ${-ri} 0 A${ri} ${ri} 0 1 0 ${ri} 0 Z`;
   const polyD = (pts) => "M" + pts.map(pt).join(" L");
   const topOf = (pts) => pts.reduce((m, q) => (q[1] < m[1] ? q : m), pts[0]);
-  const loopRho = (H, chord10) => clamp(Math.min(H * 0.05, chord10 * 0.07), 8, 44);
+  const HILL_IN = 0.2, HILL_REST = 0.08;
 
-  // o.gain: 손잡이를 당긴 만큼보다 곡선이 더 부풀게 (화면 안에서 충분히 길게)
-  // o.topLimit: 곡선 꼭대기가 넘지 않을 높이 / o.knobTop: 손잡이가 갈 수 있는 가장 위 / o.band: 고리용 띠 높이
-  function feltModel(A, B, o) {
-    const chord = B[0] - A[0], rho = o.rho, gain = o.gain || 1;
-    const c1 = [A[0] + 0.2 * chord, A[1] - 0.08 * chord];
-    const rest = [B[0] - (0.2 * chord) / gain, B[1] - (0.08 * chord) / gain];
-    const c2Of = (k) => [B[0] + (k[0] - B[0]) * gain, B[1] + (k[1] - B[1]) * gain];
-
-    // n = 고리 수. 고리는 곡선 가운데(길이 기준 22~78%)에만 생긴다
-    // k1 = 왼쪽 핸들 길이 비율, kr = 고리 크기 비율 (곡선이 펴질 때 둘 다 0으로 줄어듦)
-    function shape(knob, n, k1 = 1, kr = 1) {
-      const c2 = c2Of(knob), cc = [lerp(A[0], c1[0], k1), lerp(A[1], c1[1], k1)], N = 360, base = [];
-      for (let i = 0; i <= N; i++) base.push(bz(A, cc, c2, B, i / N));
-      const cum = [0];
-      for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + Math.hypot(base[i][0] - base[i - 1][0], base[i][1] - base[i - 1][1]));
-      const tot = cum[N] || 1, pts = [];
-      let len = 0;
-      for (let i = 0; i <= N; i++) {
-        let q = base[i];
-        if (n > 0.001) {
-          const u = clamp((cum[i] / tot - 0.22) / 0.56);
-          if (u > 0 && u < 1) {
-            const a = base[i - 1], b = base[i + 1], t = norm([b[0] - a[0], b[1] - a[1]]), nv = [-t[1], t[0]];
-            const w = kr * Math.pow(Math.sin(Math.PI * u), 2), th = 2 * Math.PI * n * u;
-            q = [q[0] + w * rho * (-Math.sin(th) * t[0] + (1 - Math.cos(th)) * nv[0]),
-              q[1] + w * rho * (-Math.sin(th) * t[1] + (1 - Math.cos(th)) * nv[1])];
-          }
-        }
-        if (i) len += Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]);
-        pts.push(q);
-      }
-      return { pts, len, ratio: len / chord };
+  function hillPts(A, B, u, N = 160) {
+    const c = B[0] - A[0], c1 = [A[0] + HILL_IN * c, A[1] - u * c], c2 = [B[0] - HILL_IN * c, B[1] - u * c], pts = [];
+    let len = 0;
+    for (let i = 0; i <= N; i++) {
+      const q = bz(A, c1, c2, B, i / N);
+      if (i) len += Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]);
+      pts.push(q);
     }
-    const RESTR = shape(rest, 0).ratio;
+    return { pts, len, ratio: len / (c || 1) };
+  }
+  // 체감 비율 r이 되는 u (길이 1인 직선으로 한 번 계산)
+  const U_CACHE = {};
+  function hillU(r) {
+    if (U_CACHE[r] != null) return U_CACHE[r];
+    let lo = 0, hi = 60;
+    if (hillPts([0, 0], [1, 0], 0, 120).ratio >= r) return (U_CACHE[r] = 0);
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (hillPts([0, 0], [1, 0], m, 120).ratio < r) lo = m; else hi = m; }
+    return (U_CACHE[r] = (lo + hi) / 2);
+  }
+  // 체감 r 언덕이 차지하는 높이 ÷ 직선 길이 (gain이 있으면 손잡이 높이도 고려)
+  const hillNeed = (r, gain) => { const u = hillU(r); return Math.max(0.75 * u, gain ? u / gain : 0); };
 
-    // 손잡이가 위로 갈 수 있는 끝 = 곡선 꼭대기가 topLimit에 닿거나, 손잡이가 고리 띠에 닿는 곳
-    const knobAt = (m) => add(B, DIR, m);
-    let mMax = isFinite(o.knobTop) ? Math.max(0, (A[1] - o.knobTop - o.band) / -DIR[1]) : chord * 20;
-    if (topOf(shape(knobAt(mMax), 0).pts)[1] < o.topLimit) {
-      let lo = 0, hi = mMax;
-      for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (topOf(shape(knobAt(m), 0).pts)[1] < o.topLimit) hi = m; else lo = m; }
-      mMax = lo;
-    }
-    const capKnob = knobAt(mMax), capY = capKnob[1];
-
-    // 기록된 체감 비율이 되는 모양: 먼저 위로 부풀고, 모자라면 고리
-    function ghost(r) {
-      if (r <= RESTR + 0.02) return { knob: rest.slice(), n: 0 };
-      if (shape(capKnob, 0).ratio >= r) {
-        let lo = 0, hi = mMax;
-        for (let k = 0; k < 32; k++) { const m = (lo + hi) / 2; if (shape(knobAt(m), 0).ratio < r) lo = m; else hi = m; }
-        return { knob: knobAt(lo), n: 0 };
-      }
-      let lo = 0, hi = 120;
-      for (let k = 0; k < 32; k++) { const m = (lo + hi) / 2; if (shape(capKnob, m).ratio < r) lo = m; else hi = m; }
-      return { knob: capKnob.slice(), n: lo };
-    }
-    return { A, B, c1, rest, chord, capY, shape, ghost, RESTR };
+  // o.gain: 손잡이를 당긴 만큼보다 언덕이 더 높아지게 / o.topY: 손잡이와 언덕 꼭대기가 넘지 않을 높이
+  function feltModel(A, B, o = {}) {
+    const chord = B[0] - A[0], gain = o.gain || 1, G = A[1];
+    const uRest = HILL_REST;
+    const uMax = isFinite(o.topY) ? Math.max(uRest, (G - o.topY) / (chord * Math.max(0.75, 1 / gain))) : 60;
+    const knobOf = (u) => [B[0] - (HILL_IN * chord) / gain, G - (u * chord) / gain];
+    const leftOf = (u) => [A[0] + (HILL_IN * chord) / gain, G - (u * chord) / gain];
+    const uOfY = (y) => clamp(((G - y) * gain) / chord, uRest, uMax);
+    const shape = (u) => hillPts(A, B, u);
+    return { A, B, chord, uRest, uMax, knobOf, leftOf, uOfY, shape, uFor: hillU, RESTR: shape(uRest).ratio };
   }
 
 
@@ -524,10 +497,8 @@
   }
 
   /* ---------- 체감 화면 ----------
-     ① 거의 일직선 + 짧은 핸들 → ② 오른쪽 핸들을 점선까지 당기면 자석처럼 맞춤
-     → ③ 작은 바퀴가 늘어난 곡선을 힘겹게 굴러감 (시간 ∝ 체감, 숫자가 같이 올라감)
-     → ④ 끝에 가까워질수록 핸들이 줄고 곡선이 빨간 직선 위로 펴짐
-     → ⑤ 도착 앵커 옆 주석 카드 → ⑥ 아래로 안내                              */
+     ① 거의 일직선 + 짧은 핸들 → ② 오른쪽 핸들을 위로 당기면 언덕이 높아지고, 점선까지 오면 자석처럼 맞춤
+     → ③ 작은 바퀴가 높아진 언덕을 힘겹게 굴러감 (시간 ∝ 체감, 숫자가 같이 올라감) → ④ 아래로 안내 */
   const MAX_FELT = Math.max(...POINTS.map((q) => val(q.felt) || 0));
   const ROLL_MAX_MS = 6000;
 
@@ -535,22 +506,25 @@
     const sec = svg.closest(".felt");
     const src = p.guide && p.guide.source, hc = COLOR[src] || NO_GUIDE;
     const r = ratioOf(p), felt = val(p.felt) || 0;
-    let W, H, M, ghost, ghostKnob, knobTop, pitch, base, n, refs, anim, roll;
+    let W, H, M, uGhost, u, refs, anim, roll;
     let state = "idle"; // idle → playing → done
 
     function layout() {
       W = svg.clientWidth; H = svg.clientHeight;
       const wide = W >= 900 && W / H >= 1.2;
-      const R = wide ? Math.min(H * 0.33, W * 0.2) : Math.min(H * 0.17, W * 0.34);
-      const G = H * 0.8, cx = R * 0.62;
-      knobTop = wide ? 96 : 120;
-      const k = Math.min(W - cx - 40, 1.5 * (G - knobTop)) / MAX_ACTUAL; // 1분 = k px (세 지점 공통)
+      const R0 = wide ? Math.min(H * 0.33, W * 0.2) : Math.min(H * 0.17, W * 0.34);
+      const G = H * 0.8;
+      // 언덕 꼭대기 위로 글자("그날 느낀 시간 / 체감 n분") 자리를 남긴다
+      const topY = wide ? 118 : 138;
+      // 1분 = k px. 보통은 세 지점 공통 축척, 언덕이 화면을 넘을 지점(03)만 바퀴까지 그림 전체를 작게
+      const kCommon = Math.min(W - R0 * 0.62 - 40, 1.5 * (G - topY)) / MAX_ACTUAL;
+      const kFit = (G - topY) / (hillNeed(r, 2.2) * (val(p.actual) || 1));
+      const k = Math.min(kCommon, kFit);
+      const R = R0 * Math.max(0.5, k / kCommon), cx = R * 0.62;
       const A = [cx, G], B = [cx + k * (val(p.actual) || 1), G];
-      const band = (G - knobTop) * 0.24; // 손잡이를 이 띠까지 당기면 고리
-      M = feltModel(A, B, { gain: 2.2, topLimit: knobTop + 30, knobTop, band, rho: loopRho(H, k * MAX_ACTUAL) });
-      ghost = M.ghost(r);
-      pitch = ghost.n > 0 ? ((M.capY - knobTop) * 0.75) / ghost.n : band / 4;
-      ghostKnob = ghost.n > 0 ? [ghost.knob[0], M.capY - ghost.n * pitch] : ghost.knob;
+      M = feltModel(A, B, { gain: 2.2, topY: 24 });
+      uGhost = Math.min(M.uFor(r), M.uMax);
+      const gk = M.knobOf(uGhost);
 
       svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
       let spokes = "";
@@ -566,8 +540,8 @@
           <g class="f-spokes">${spokes}</g>
           <circle class="f-hub" r="${f1(R * 0.07)}"/>
         </g>
-        <g class="f-target"><path class="f-ghost" d="${polyD(M.shape(ghost.knob, ghost.n).pts)}"/>
-          <circle class="f-ghost-knob" r="9" cx="${f1(ghostKnob[0])}" cy="${f1(ghostKnob[1])}"/></g>
+        <g class="f-target"><path class="f-ghost" d="${polyD(M.shape(uGhost).pts)}"/>
+          <circle class="f-ghost-knob" r="9" cx="${f1(gk[0])}" cy="${f1(gk[1])}"/></g>
         <line class="f-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
         <path class="f-curve"/>
         <g class="f-left"><line class="f-handle" stroke="${hc}" x1="${f1(A[0])}" y1="${f1(G)}"/><circle class="f-knob" fill="${hc}" r="5.5"/></g>
@@ -588,26 +562,19 @@
       refs.drag.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
     }
 
-    // 손잡이 위치 → 곡선 모양 (고리 띠 위로 당기면 고리가 늘어남)
-    const knobOf = () => (n > 0 ? [base[0], M.capY - n * pitch] : base);
-    function fromKnob(q) {
-      if (q[1] >= M.capY) { base = q; n = 0; }
-      else { base = [q[0], M.capY]; n = (M.capY - q[1]) / pitch; }
-    }
-
-    // 곡선 + 양쪽 핸들. knob = 화면에 보이는 오른쪽 손잡이, k1 = 왼쪽 핸들 길이 비율
-    function drawShape(s, knob, k1) {
+    // 언덕 + 양쪽 핸들 (왼쪽은 오른쪽을 좌우로 비춘 자리)
+    function drawShape(s, uu) {
+      const knob = M.knobOf(uu), left = M.leftOf(uu);
       refs.curve.setAttribute("d", polyD(s.pts));
       refs.dragLine.setAttribute("x1", f1(M.B[0])); refs.dragLine.setAttribute("y1", f1(M.B[1]));
       refs.dragLine.setAttribute("x2", f1(knob[0])); refs.dragLine.setAttribute("y2", f1(knob[1]));
       refs.dragKnobs.forEach((ci) => { ci.setAttribute("cx", f1(knob[0])); ci.setAttribute("cy", f1(knob[1])); });
-      const c = [lerp(M.A[0], M.c1[0], k1), lerp(M.A[1], M.c1[1], k1)];
-      refs.leftLine.setAttribute("x2", f1(c[0])); refs.leftLine.setAttribute("y2", f1(c[1]));
-      refs.leftKnob.setAttribute("cx", f1(c[0])); refs.leftKnob.setAttribute("cy", f1(c[1]));
+      refs.leftLine.setAttribute("x2", f1(left[0])); refs.leftLine.setAttribute("y2", f1(left[1]));
+      refs.leftKnob.setAttribute("cx", f1(left[0])); refs.leftKnob.setAttribute("cy", f1(left[1]));
     }
     function label(s, minutes, day) {
       const top = topOf(s.pts), flat = M.A[1] - top[1] < 40;
-      // 거의 펴졌으면 직선 가운데 위에
+      // 거의 평평하면 직선 가운데 위에
       const x = f1(clamp(flat ? (M.A[0] + M.B[0]) / 2 : top[0], 90, W - 90)), y = Math.min(top[1] - 18, M.A[1] - 22);
       refs.text.setAttribute("x", x); refs.text.setAttribute("y", f1(y));
       refs.day.setAttribute("x", x); refs.day.setAttribute("dy", "-1.6em");
@@ -616,8 +583,8 @@
       refs.min.textContent = `체감 ${Math.round(minutes)}분`;
     }
     function draw() {
-      const s = M.shape(base, n);
-      drawShape(s, knobOf(), 1);
+      const s = M.shape(u);
+      drawShape(s, u);
       label(s, (val(p.actual) || 0) * s.ratio, false);
     }
 
@@ -635,10 +602,10 @@
       const end = () => { stop(); springBack(); };
       function move(ev) {
         const b = svg.getBoundingClientRect();
-        fromKnob([clamp(ev.clientX - b.left, 10, W - 10), clamp(ev.clientY - b.top, knobTop - 40, M.A[1] + 30)]);
+        u = M.uOfY(ev.clientY - b.top); // 위아래로만: 언덕이 높아지거나 낮아짐
         // 점선 목표 가까이 오면 자석처럼 딱 맞추고 바로 굴러가기 시작
-        if (r > M.RESTR + 0.1 && Math.abs(M.shape(base, n).ratio - r) < r * 0.1) {
-          base = ghost.knob.slice(); n = ghost.n;
+        if (r > M.RESTR + 0.1 && Math.abs(M.shape(u).ratio - r) < r * 0.1) {
+          u = uGhost;
           stop();
           play();
           return;
@@ -652,10 +619,10 @@
 
     // 점선까지 못 당기고 놓으면 제자리로
     function springBack() {
-      const from = knobOf(), t0 = performance.now(), dur = RM.matches ? 1 : 600;
+      const from = u, t0 = performance.now(), dur = RM.matches ? 1 : 600;
       const step = (now) => {
         const t = clamp((now - t0) / dur), e = 1 - Math.pow(1 - t, 3);
-        fromKnob([lerp(from[0], M.rest[0], e), lerp(from[1], M.rest[1], e)]);
+        u = lerp(from, M.uRest, e);
         draw();
         if (t < 1) anim = requestAnimationFrame(step);
       };
@@ -673,14 +640,13 @@
       return { p: [lerp(a[0], b[0], t), lerp(a[1], b[1], t)], dir: norm([b[0] - a[0], b[1] - a[1]]), dist: L * clamp(f) };
     }
 
-    // ③ 늘어난 곡선을 따라 굴러감. f = 0..1 진행 (펴짐은 해결 화면에서)
+    // ③ 높아진 언덕을 따라 굴러감. f = 0..1 진행 (펴짐은 해결 화면에서)
     let travelled = 0, lastAt = null;
     function frame(f) {
-      const shown = ghost.n > 0 ? ghostKnob : ghost.knob;
-      const s = M.shape(ghost.knob, ghost.n);
-      drawShape(s, shown, 1);
+      const s = M.shape(uGhost);
+      drawShape(s, uGhost);
       label(s, felt * f, true);
-      // 작은 바퀴: 곡선 위를 굴러감 + 살짝 덜컹
+      // 작은 바퀴: 언덕 위를 굴러감 + 살짝 덜컹
       const at = along(s.pts, f), up = [at.dir[1], -at.dir[0]];
       if (lastAt) travelled += Math.hypot(at.p[0] - lastAt[0], at.p[1] - lastAt[1]);
       lastAt = at.p;
@@ -719,12 +685,12 @@
     }
 
     // 안내: 핸들 → 점선 목표
-    const hint = makeHint(sec, { key: "felt", mode: "drag", pts: () => (M ? { from: knobOf(), to: ghostKnob } : null), active: () => state === "idle" });
+    const hint = makeHint(sec, { key: "felt", mode: "drag", pts: () => (M ? { from: M.knobOf(u), to: M.knobOf(uGhost) } : null), active: () => state === "idle" });
 
     function render() {
       cancelAnimationFrame(anim);
       layout();
-      if (state === "idle") { base = M.rest.slice(); n = 0; draw(); hint.refresh(); return; }
+      if (state === "idle") { u = M.uRest; draw(); hint.refresh(); return; }
       cancelAnimationFrame(roll);
       finish();
     }
@@ -980,13 +946,14 @@
     const svg = $(`#ob${i + 1} .ob-svg`);
     if (!svg) return null;
     let M = null, raf = 0, on = false, t0 = 0, W = 0, H = 0;
-    const r = i === 0 ? 1.45 : 2.1; // ① 깔끔한 아치로만 부풂 / ② 훨씬 길게 (고리)
+    const r = i === 0 ? 1.45 : 2.1; // ① 낮은 언덕 / ② 훨씬 높은 언덕
     function layout() {
       W = svg.clientWidth; H = svg.clientHeight;
       if (!W) return;
-      const chord = i === 0 ? Math.min(W * 0.56, 360) : Math.min(W * 0.62, 460), A = [(W - chord) / 2, H * 0.78], B = [A[0] + chord, A[1]];
-      // ①은 고리 없이 아치로만 (위 한계 없음), ②는 화면 높이를 넘는 만큼 고리
-      M = feltModel(A, B, { gain: 2.2, topLimit: i === 0 ? -Infinity : 14, knobTop: -Infinity, band: 0, rho: 8 });
+      // 언덕 꼭대기가 그림 안에 들어오게 직선 길이를 정함
+      const G = H * 0.78, chord = Math.min(i === 0 ? Math.min(W * 0.56, 360) : Math.min(W * 0.62, 460), (G - 10) / hillNeed(r, 2.2));
+      const A = [(W - chord) / 2, G], B = [A[0] + chord, A[1]];
+      M = feltModel(A, B, { gain: 2.2 });
       svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
       let spokes = "";
       const rw = 15;
@@ -1003,8 +970,8 @@
     // g: 0 = 펴짐, 1 = 다 부풂
     function set(g) {
       if (!M) return;
-      const gh = M.ghost(lerp(M.RESTR, r, g));
-      const s = M.shape(gh.knob, gh.n), c1 = M.c1, A = M.A, B = M.B, k2 = gh.knob;
+      const uu = lerp(M.uRest, M.uFor(r), g);
+      const s = M.shape(uu), c1 = M.leftOf(uu), A = M.A, B = M.B, k2 = M.knobOf(uu);
       $(".ob-curve", svg).setAttribute("d", polyD(s.pts));
       const at = (sel, a, b) => { const e = $(sel, svg); e.setAttribute("x1", f1(a[0])); e.setAttribute("y1", f1(a[1])); e.setAttribute("x2", f1(b[0])); e.setAttribute("y2", f1(b[1])); };
       at(".ob-h1", A, c1); at(".ob-h2", B, k2);
@@ -1085,14 +1052,15 @@
   // 아래쪽 작은 체감 곡선 (체감 화면에서 늘어난 그대로 → 해결되면 펴짐)
   function miniFelt(svg, p) {
     const r = ratioOf(p);
-    let M, gh, W, H;
+    let M, ug, W, H;
     function layout() {
       W = svg.clientWidth; H = svg.clientHeight;
-      const k = Math.min(W * 0.62, 520) / MAX_ACTUAL, G = H - 28;
-      const A = [18, G], B = [18 + k * (val(p.actual) || 1), G];
-      const rho = clamp(H * 0.06, 5, 10);
-      M = feltModel(A, B, { topLimit: 10 + 2 * rho, knobTop: -Infinity, band: 0, rho });
-      gh = M.ghost(r);
+      const G = H - 28, a = val(p.actual) || 1;
+      // 언덕 꼭대기가 띠 안에 들어오게 (03처럼 높은 언덕은 작게)
+      const k = Math.min(Math.min(W * 0.62, 520) / MAX_ACTUAL, (G - 10) / (hillNeed(r) * a));
+      const A = [18, G], B = [18 + k * a, G];
+      M = feltModel(A, B);
+      ug = M.uFor(r);
       svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
       svg.innerHTML = `<line class="f-ground" x1="0" y1="${f1(G)}" x2="${f1(W)}" y2="${f1(G)}"/>
         <line class="f-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
@@ -1102,8 +1070,7 @@
         <text class="r-t r-felt" x="${f1(B[0] + 12)}" y="${f1(G - 12)}">체감 ${val(p.felt)}분</text>`;
     }
     function set(g) {
-      const kb = [lerp(gh.knob[0], M.B[0], g), lerp(gh.knob[1], M.B[1], g)];
-      $(".r-curve", svg).setAttribute("d", polyD(M.shape(kb, gh.n * (1 - g), 1 - g, (1 - g) * (1 - g)).pts));
+      $(".r-curve", svg).setAttribute("d", polyD(M.shape(ug * (1 - g)).pts));
       $(".r-felt", svg).setAttribute("opacity", f1(1 - g));
       $(".r-curve", svg).setAttribute("opacity", g >= 1 ? 0 : 1); // 다 펴지면 빨간 직선만
     }
@@ -1446,14 +1413,15 @@
   function drawCompare() {
     const svg = $(".cmp-svg"), W = svg.clientWidth, H = svg.clientHeight;
     const cols = POINTS.length, colW = W / cols, pad = Math.min(16, colW * 0.08);
-    const G = H - 8, top = 8, k = (colW - 2 * pad) / MAX_ACTUAL;
-    const rho = loopRho(H * 1.3, k * MAX_ACTUAL);
+    const G = H - 8, top = 8;
+    // 같은 축척: 가장 높은 언덕도 그림 안에 들어오게
+    const k = Math.min((colW - 2 * pad) / MAX_ACTUAL, ...POINTS.map((p) => (G - top) / (hillNeed(ratioOf(p)) * (val(p.actual) || 1))));
     svg.setAttribute("viewBox", `0 0 ${f1(W)} ${f1(H)}`);
     let out = `<line class="f-ground" x1="0" y1="${f1(G)}" x2="${f1(W)}" y2="${f1(G)}"/>`;
     POINTS.forEach((p, i) => {
       const A = [i * colW + pad, G], B = [A[0] + k * (val(p.actual) || 1), G];
-      const M = feltModel(A, B, { topLimit: top + 2 * rho, knobTop: -Infinity, band: 0, rho }), g = M.ghost(ratioOf(p));
-      out += `<path class="cmp-curve${ratioOf(p) === maxR ? " max" : ""}" d="${polyD(M.shape(g.knob, g.n).pts)}"/>
+      const M = feltModel(A, B);
+      out += `<path class="cmp-curve${ratioOf(p) === maxR ? " max" : ""}" d="${polyD(M.shape(M.uFor(ratioOf(p))).pts)}"/>
         <line class="f-real" x1="${f1(A[0])}" y1="${f1(G)}" x2="${f1(B[0])}" y2="${f1(G)}"/>
         ${[A, B].map((q) => `<rect class="f-anchor" x="${f1(q[0] - 4)}" y="${f1(q[1] - 4)}" width="8" height="8"/>`).join("")}`;
     });
