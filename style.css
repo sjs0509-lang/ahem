@@ -138,18 +138,20 @@ html.v-lock, html.v-lock body { overflow: hidden; }
   .wnav-marks i { width: 5px; height: 5px; margin: -2.5px 0 0 -9px; }
 }
 
-/* 표지 지도의 은은한 움직임: 아주 느리고 작게, 요소마다 박자가 다르게 */
+/* 표지 지도의 움직임: 느리고 통통하게, 요소마다 박자가 다르게 */
 .t-coast { display: none; }
 #map-intro .t-coast { display: inline; fill: none; stroke: var(--sea-ink); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 5 9; opacity: .45; animation: t-coast 14s linear infinite, t-coast-o 7s ease-in-out infinite alternate; }
 @keyframes t-coast { to { stroke-dashoffset: -140; } }
 @keyframes t-coast-o { from { opacity: .25; } to { opacity: .6; } }
 #map-intro .t-wave, #map-intro .t-tree, #map-intro .t-star { transform-box: fill-box; transform-origin: center; }
 #map-intro .t-wave { animation: t-wave var(--d, 8s) ease-in-out var(--dl, 0s) infinite alternate; }
-@keyframes t-wave { from { transform: translateX(-5px); } to { transform: translateX(5px); } }
+@keyframes t-wave { 0% { transform: translate(-9px, 0); } 50% { transform: translate(0, -3px); } 100% { transform: translate(9px, 0); } }
+/* 나무: 젤리처럼 통통 (아래를 붙인 채 눌렸다 늘어남) */
 #map-intro .t-tree { transform-origin: center bottom; animation: t-breathe var(--d, 5s) ease-in-out var(--dl, 0s) infinite; }
-@keyframes t-breathe { 0%, 100% { transform: scale(1) rotate(0); } 35% { transform: scale(1.025) rotate(.9deg); } 70% { transform: scale(.995) rotate(-.7deg); } }
-#map-intro .t-star { animation: t-twinkle var(--d, 3.6s) ease-in-out var(--dl, 0s) infinite; }
-@keyframes t-twinkle { 0%, 100% { transform: rotate(0) scale(.8); opacity: .45; } 50% { transform: rotate(25deg) scale(1.15); opacity: 1; } }
+@keyframes t-breathe { 0%, 100% { transform: scale(1, 1) rotate(0); } 20% { transform: scale(1.06, .94) rotate(-1.5deg); } 40% { transform: scale(.96, 1.07) rotate(1.8deg); } 55% { transform: scale(1.02, .98) rotate(-.6deg); } 70% { transform: scale(1, 1) rotate(0); } }
+/* 반짝이: 퐁 하고 커졌다 돌며 작아짐 */
+#map-intro .t-star { animation: t-twinkle var(--d, 3.6s) cubic-bezier(.3, 1.6, .5, 1) var(--dl, 0s) infinite; }
+@keyframes t-twinkle { 0%, 100% { transform: rotate(0) scale(.6); opacity: .4; } 35% { transform: rotate(45deg) scale(1.45); opacity: 1; } 60% { transform: rotate(80deg) scale(1); opacity: .9; } }
 @media (prefers-reduced-motion: reduce) {
   #map-intro .t-wave, #map-intro .t-tree, #map-intro .t-star, #map-intro .t-coast { animation: none; }
 }
