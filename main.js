@@ -1671,7 +1671,14 @@
     </div>`;
   $("#photos").innerHTML = timeline;
   // 3-④ 깨달음: 마지막 문장
-  $("#thesis").innerHTML = `<p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
+  // 3-④ 맞추다: 길을 맞힌 게 아니라, 정보들을 서로 맞춰본 것
+  const MN = TEXT.meaning;
+  $("#meaning").innerHTML = `<p class="mn-title">${MN.title.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
+    <dl class="mn-words">${MN.words.map((w) => `<div class="${w.no ? "no" : "yes"}"><dt><span>${esc(w.word)}</span></dt><dd>${esc(w.mean)}</dd></div>`).join("")}</dl>
+    <p class="mn-line">${esc(MN.line)}</p>`;
+  // 3-⑤ 마지막 문장 + 익숙함과 불안
+  $("#thesis").innerHTML = `<p class="big">${TEXT.thesis.map((t) => `<span>${esc(t)}</span>`).join("")}</p>
+    <p class="after">${(TEXT.thesisAfter || []).map((t) => `<span>${esc(t)}</span>`).join("")}</p>`;
 
   /* =========================================================
      지도 장면 재생: 화면에 들어오면 처음부터, 나가면 처음 상태로
