@@ -1947,6 +1947,23 @@
       later(chirp, rand(6000, 15000));
     }
 
+    /* 아이폰: 무음 스위치를 켜 두면 웹 소리(Web Audio)가 통째로 꺼진다.
+       "미디어 재생" 소리로 바꿔 두면 들림 → audioSession이 있으면 playback으로, 없으면 아무 소리 없는 오디오를 같이 틀어 둠 */
+    let silent = null;
+    function mediaMode() {
+      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) { /* 지원 안 하면 아래 방법 */ }
+      if (silent) { if (silent.paused) silent.play().catch(() => {}); return; }
+      // 0.5초짜리 무음 WAV (8kHz, 8bit)
+      const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, s) => [...s].forEach((c, i) => (b[o + i] = c.charCodeAt(0)));
+      w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+      b.fill(128, 44);
+      let bin = ""; b.forEach((x) => (bin += String.fromCharCode(x)));
+      silent = new Audio("data:audio/wav;base64," + btoa(bin));
+      silent.loop = true;
+      silent.setAttribute("playsinline", "");
+      silent.play().catch(() => {});
+    }
     // 소리 길: 배경음(master)과 효과음(fx)을 따로 → 배경음을 꺼 둬도 벨은 울림
     function ensureCtx() {
       if (ctx) return;
@@ -1972,6 +1989,7 @@
     }
     function start() {
       build();
+      mediaMode();
       if (ctx.state === "suspended") ctx.resume();
       on = true; muted = false;
       timers.forEach(clearTimeout); timers = [];
@@ -1988,7 +2006,7 @@
       if (ctx) {
         master.gain.cancelScheduledValues(ctx.currentTime);
         master.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
-        setTimeout(() => { if (!on && ctx.state === "running") ctx.suspend(); }, 1200);
+        setTimeout(() => { if (!on && ctx.state === "running") ctx.suspend(); if (!on && silent) silent.pause(); }, 1200);
       }
       render();
     }
@@ -2021,17 +2039,19 @@
       };
       if (ctx.state === "running") ring();
       else ctx.resume().then(() => { if (ctx.state === "running") ring(); }).catch(() => {});
+      mediaMode();
     };
     // 화면을 처음 누르거나 키를 누를 때 소리를 허락받아 둠 (그래야 나중에 벨이 바로 울림)
+    //   아이폰은 손가락을 뗄 때(touchend·click)만 허락으로 쳐서, 그 순간들도 같이 듣는다
+    const UNLOCK = ["pointerdown", "touchend", "click", "keydown"];
     const unlock = () => {
-      window.removeEventListener("pointerdown", unlock, true);
-      window.removeEventListener("keydown", unlock, true);
       if (muted) return;
       ensureCtx();
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      mediaMode();
+      const done = () => { if (ctx.state === "running") UNLOCK.forEach((t) => window.removeEventListener(t, unlock, true)); };
+      if (ctx.state === "suspended") ctx.resume().then(done).catch(() => {}); else done();
     };
-    window.addEventListener("pointerdown", unlock, true);
-    window.addEventListener("keydown", unlock, true);
+    UNLOCK.forEach((t) => window.addEventListener(t, unlock, true));
     btn.addEventListener("click", () => { if (on) stop(); else start(); store(on); });
     // 켜 두었던 사람은 화면을 처음 누를 때 다시 켜짐
     if (saved()) {
